@@ -1,0 +1,4 @@
+stable-baselines3
+imitation
+gymnasium
+numpy

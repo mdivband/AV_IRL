@@ -4,12 +4,21 @@ from imitation.algorithms.adversarial.gail import GAIL
 from imitation.rewards.reward_nets import BasicShapedRewardNet
 from imitation.util.networks import RunningNorm
 from imitation.util.util import make_vec_env
+from av_irl import SafeDistanceRewardWrapper
 from imitation.rewards.reward_wrapper import RewardVecEnvWrapper
 from stable_baselines3 import PPO
 from stable_baselines3.common.evaluation import evaluate_policy
 
-def train_gail(env_name, rollout_filename, learner:PPO, rng, ts):
-    venv = make_vec_env(env_name, n_envs=8, parallel=True, rng=rng)
+def train_gail(env_name, rollout_filename, learner: PPO, rng, ts):
+    venv = make_vec_env(
+        env_name,
+        n_envs=8,
+        parallel=True,
+        rng=rng,
+        env_kwargs={"initial_spacing": 2.0},
+    )
+    venv = SafeDistanceRewardWrapper(venv)
+
     learner.set_env(venv)
 
     reward_net = BasicShapedRewardNet(
@@ -51,7 +60,14 @@ if __name__ == '__main__':
 
         env_name_h = "highway-fast-v0"
 
-        venv = make_vec_env(env_name_h, n_envs=8, parallel=True, rng=rng)
+        venv = make_vec_env(
+            env_name_h,
+            n_envs=8,
+            parallel=True,
+            rng=rng,
+            env_kwargs={"initial_spacing": 2.0},
+        )
+        venv = SafeDistanceRewardWrapper(venv)
 
         learner = PPO(
             'MlpPolicy',

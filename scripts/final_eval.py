@@ -4,6 +4,8 @@ import numpy as np
 import random
 import sys
 from collections import Counter
+from av_irl import calculate_safe_distance
+
 
 expert = PPO.load('model2/expert_ppo_mlt_hfst_m_h_old') # 22.15 22.16 12.775
 learner = PPO.load("model2/gail_learner_august_e8k_ts100000_ts100000_mlt_old") # reward:20.15 22 12.45
@@ -58,6 +60,7 @@ r = []
 dl = []
 rl = []
 crash = 0
+safe = []
 
 for i in range(rnd):
     obs, info = env.reset(seed=s[i])
@@ -70,11 +73,13 @@ for i in range(rnd):
     n = 0
     data = []
     data_r = []
+    pen = 0.0
     while not (done or truncated):
         action, _states = model.predict(obs, deterministic=True)
         acts.append(action)
         obs, reward, done, truncated, info = env.step(action)
         rs.append(reward)
+        pen += calculate_safe_distance(info)
         # print(info)
         tmp = (n,int(action))
         score += reward
@@ -84,6 +89,8 @@ for i in range(rnd):
         data.append(tmp)
         data_r.append(tmp2)
     r.append(score)
+    safe.append(pen)
+
     # print(f"score: {score}, seed:{s[i]}")
     # print(acts)
     dl.append(data)
@@ -106,21 +113,20 @@ for i in range(rnd):
 #print(dl)
 #print(rl)
 
-
-
 print(f"{sys.argv[1]} mean score: {np.mean(r)}")
 print(f"{sys.argv[1]} median score: {np.median(r)}")
-print(f"collsion rate: {crash/rnd}")
-
+print(f"mean safe distance penalty: {np.mean(safe)}")
 
 if cal_cor:
     crash2 = 0
     r = []
     dl2 = []
     rl2 = []
+    safe2 = []
     model = learner
     for i in range(rnd):
         obs, info = env.reset(seed=s[i])
+
         #obs, info = env.reset(seed=48)
         #obs, info = env.reset()
         done = truncated = False
@@ -130,11 +136,13 @@ if cal_cor:
         data = []
         data_r = []
         rs = []
+        pen = 0.0
         while not (done or truncated):
             action, _states = model.predict(obs, deterministic=True)
             acts.append(action)
             obs, reward, done, truncated, info = env.step(action)
             rs.append(reward)
+            pen += calculate_safe_distance(info)
             #print(info)
             tmp = (n,int(action))
             score += reward
@@ -144,6 +152,7 @@ if cal_cor:
             data.append(tmp)
             data_r.append(tmp2)
         r.append(score)
+        safe2.append(pen)
         # print(f"score: {score}, seed:{s[i]}")
         # print(acts)
         dl2.append(data)
@@ -160,10 +169,9 @@ if cal_cor:
             if len(acts) != 30:
                 crash2 += 1
 
-
-    print(f"{sys.argv[1]} mean score: {np.mean(r)}")
-    print(f"{sys.argv[1]} median score: {np.median(r)}")
-    print(f"collsion rate: {crash2/rnd}")
+    print(f"{sys.argv[1]} mean score: {np.mean(r)}")␊
+    print(f"{sys.argv[1]} median score: {np.median(r)}")␊
+    print(f"mean safe distance penalty: {np.mean(safe2)}")
 
     ca, cr = [], []
     ns = []

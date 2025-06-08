@@ -1,6 +1,7 @@
 from stable_baselines3 import PPO
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.env_util import make_vec_env
+from av_irl import SafeDistanceRewardWrapper
 from stable_baselines3.common.vec_env import SubprocVecEnv
 from gymnasium import Wrapper
 
@@ -26,7 +27,15 @@ if __name__ == '__main__':
         n_cpu = 6
         batch_size = 512
         # batch_size = 64
-        env = make_vec_env('highway-fast-v0', n_envs=n_cpu, vec_env_cls=SubprocVecEnv)
+        # env = make_vec_env('highway-fast-v0', n_envs=n_cpu, vec_env_cls=SubprocVecEnv)
+
+        env = make_vec_env(
+                    'highway-fast-v0',
+                    n_envs=n_cpu,
+                    vec_env_cls=SubprocVecEnv,
+                    env_kwargs={'initial_spacing': 2.0},
+                )
+        env = SafeDistanceRewardWrapper(env)
 
     print('Building Model')
 
@@ -51,7 +60,17 @@ if __name__ == '__main__':
     # print('Saving Completed. (scenario 1, highway 1)')
 
     # using a different env to continue train the expert, use merge env
-    env_m = make_vec_env('merge-v0', n_envs=n_cpu, vec_env_cls=SubprocVecEnv)
+    # env_m = make_vec_env('merge-v0', n_envs=n_cpu, vec_env_cls=SubprocVecEnv)
+
+    env_m = make_vec_env(
+        'merge-v0',
+        n_envs=n_cpu,
+        vec_env_cls=SubprocVecEnv,
+        env_kwargs={'initial_spacing': 2.0},
+    )
+    env_m = SafeDistanceRewardWrapper(env_m)
+
+
     # expert2 = PPO.load(model_name)
     expert.set_env(env_m)
     print('Training in merge')
@@ -63,7 +82,14 @@ if __name__ == '__main__':
 
     # using a different env to continue train the expert, use more vehicles, 50->70
     # env_h2 = make_vec_env('highway-v0', n_envs=n_cpu, vec_env_cls=SubprocVecEnv, env_kwargs={'vehicles_count': 70})
-    env_h2 = make_vec_env('highway-v0', n_envs=n_cpu, vec_env_cls=SubprocVecEnv)
+    # env_h2 = make_vec_env('highway-v0', n_envs=n_cpu, vec_env_cls=SubprocVecEnv)
+    env_h2 = make_vec_env(
+        'highway-v0',
+        n_envs=n_cpu,
+        vec_env_cls=SubprocVecEnv,
+        env_kwargs={'initial_spacing': 2.0},
+    )
+    env_h2 = SafeDistanceRewardWrapper(env_h2)
 
     # expert3 = PPO.load(model_name)
     expert.set_env(env_h2)

@@ -9,7 +9,15 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.evaluation import evaluate_policy
 
 def train_airl(env_name, rollout_filename, learner:PPO, rng, ts):
-    venv = make_vec_env(env_name, n_envs=8, parallel=True, rng=rng)
+    venv = make_vec_env(
+        env_name,
+        n_envs=8,
+        parallel=True,
+        rng=rng,
+        env_kwargs={"initial_spacing": 2.0},
+    )
+    venv = SafeDistanceRewardWrapper(venv)
+
     learner.set_env(venv)
 
     reward_net = BasicShapedRewardNet(
@@ -52,7 +60,14 @@ if __name__ == '__main__':
 
         env_name_h = "highway-fast-v0"
 
-        venv = make_vec_env(env_name_h, n_envs=8, parallel=True, rng=rng)
+        venv = make_vec_env(
+            env_name_h,
+            n_envs=8,
+            parallel=True,
+            rng=rng,
+            env_kwargs={"initial_spacing": 2.0},
+        )
+        venv = SafeDistanceRewardWrapper(venv)
 
         learner = PPO(
             'MlpPolicy',

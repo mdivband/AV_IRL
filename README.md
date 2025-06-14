@@ -2,7 +2,7 @@
 
 This project contains utilities for training and evaluating autonomous vehicle agents using inverse reinforcement learning (IRL). It demonstrates adversarial IRL techniques based on **Generative Adversarial Imitation Learning (GAIL)** and **Adversarial Inverse Reinforcement Learning (AIRL)**. Training scripts rely on [Stable-Baselines3](https://github.com/DLR-RM/stable-baselines3), [imitation](https://github.com/HumanCompatibleAI/imitation), and `gymnasium` environments representing highway-style driving tasks.
 
-All environments are wrapped with a **SafeDistanceRewardWrapper** which subtracts a continuous penalty for driving too close to other vehicles. This encourages safer behaviour and replaces the previous boolean collision reward.
+All environments are wrapped with a **SafeDistanceRewardWrapper** which subtracts a continuous penalty for driving too close to nearby vehicles. Distances to the lead car and lateral neighbours are inferred directly from the environment using the `neighbour_vehicles` and `close_vehicles_to` helpers from `highway-env`. A **TimePenaltyWrapper** applies a small negative reward each step so agents learn to reach their goal quickly. These wrappers encourage safer behaviour and faster completion compared to the previous boolean collision reward.
 
 ## Project Layout
 
@@ -57,6 +57,7 @@ python scripts/reward_comparison.py
 The script trains two AIRL models using coefficients `a` and `b`.
 `RewardScaleWrapper` scales the environment reward by `a` while
 `SafeDistanceRewardWrapper` subtracts `b` times the safe-distance penalty.
+`TimePenaltyWrapper` always applies a small per-step penalty.
 
 ### Coefficients `a` and `b`
 

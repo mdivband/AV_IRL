@@ -7,6 +7,8 @@ from imitation.util.util import make_vec_env
 from imitation.rewards.reward_wrapper import RewardVecEnvWrapper
 from stable_baselines3 import PPO
 from stable_baselines3.common.evaluation import evaluate_policy
+from av_irl import SafeDistanceRewardWrapper, TimePenaltyWrapper
+
 
 def train_airl(env_name, rollout_filename, learner:PPO, rng, ts):
     venv = make_vec_env(
@@ -17,6 +19,8 @@ def train_airl(env_name, rollout_filename, learner:PPO, rng, ts):
         env_kwargs={"initial_spacing": 2.0},
     )
     venv = SafeDistanceRewardWrapper(venv)
+    venv = TimePenaltyWrapper(venv)
+
 
     learner.set_env(venv)
 
@@ -68,6 +72,8 @@ if __name__ == '__main__':
             env_kwargs={"initial_spacing": 2.0},
         )
         venv = SafeDistanceRewardWrapper(venv)
+        venv = TimePenaltyWrapper(venv)
+
 
         learner = PPO(
             'MlpPolicy',

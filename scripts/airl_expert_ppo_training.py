@@ -1,7 +1,7 @@
 from stable_baselines3 import PPO
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.env_util import make_vec_env
-from av_irl import SafeDistanceRewardWrapper
+from av_irl import SafeDistanceRewardWrapper, TimePenaltyWrapper
 from stable_baselines3.common.vec_env import SubprocVecEnv
 from gymnasium import Wrapper
 
@@ -28,14 +28,15 @@ if __name__ == '__main__':
         batch_size = 512
         # batch_size = 64
         # env = make_vec_env('highway-fast-v0', n_envs=n_cpu, vec_env_cls=SubprocVecEnv)
-
+        
         env = make_vec_env(
-                    'highway-fast-v0',
-                    n_envs=n_cpu,
-                    vec_env_cls=SubprocVecEnv,
-                    env_kwargs={'initial_spacing': 2.0},
-                )
+            'highway-fast-v0',
+            n_envs=n_cpu,
+            vec_env_cls=SubprocVecEnv,
+            env_kwargs={'initial_spacing': 2.0},
+        )
         env = SafeDistanceRewardWrapper(env)
+        env = TimePenaltyWrapper(env)
 
     print('Building Model')
 
@@ -69,6 +70,7 @@ if __name__ == '__main__':
         env_kwargs={'initial_spacing': 2.0},
     )
     env_m = SafeDistanceRewardWrapper(env_m)
+    env_m = TimePenaltyWrapper(env_m)
 
 
     # expert2 = PPO.load(model_name)
@@ -90,6 +92,7 @@ if __name__ == '__main__':
         env_kwargs={'initial_spacing': 2.0},
     )
     env_h2 = SafeDistanceRewardWrapper(env_h2)
+    env_h2 = TimePenaltyWrapper(env_h2)
 
     # expert3 = PPO.load(model_name)
     expert.set_env(env_h2)

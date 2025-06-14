@@ -3,7 +3,7 @@ from stable_baselines3 import PPO
 from imitation.algorithms.adversarial.airl import AIRL
 from imitation.rewards.reward_nets import BasicShapedRewardNet
 from imitation.util.util import make_vec_env
-from av_irl import SafeDistanceRewardWrapper, RewardScaleWrapper
+from av_irl import SafeDistanceRewardWrapper, RewardScaleWrapper, TimePenaltyWrapper
 
 
 def train_airl_with_coeff(a: float, b: float, steps: int = 1000):
@@ -14,6 +14,7 @@ def train_airl_with_coeff(a: float, b: float, steps: int = 1000):
     )
     env = RewardScaleWrapper(env, scale=a)
     env = SafeDistanceRewardWrapper(env, weight=b)
+    env = TimePenaltyWrapper(env)
 
     learner = PPO("MlpPolicy", env, n_steps=64, batch_size=64, verbose=0)
     reward_net = BasicShapedRewardNet(env.observation_space, env.action_space)

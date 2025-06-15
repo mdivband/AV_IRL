@@ -16,7 +16,7 @@ def train_airl(env_name, rollout_filename, learner:PPO, rng, ts):
         n_envs=8,
         parallel=True,
         rng=rng,
-        env_kwargs={"initial_spacing": 2.0},
+        env_kwargs={"ego_spacing": 3.0},
     )
     venv = SafeDistanceRewardWrapper(venv)
     venv = TimePenaltyWrapper(venv)
@@ -69,7 +69,7 @@ if __name__ == '__main__':
             n_envs=8,
             parallel=True,
             rng=rng,
-            env_kwargs={"initial_spacing": 2.0},
+            env_kwargs={"ego_spacing": 3.0},
         )
         venv = SafeDistanceRewardWrapper(venv)
         venv = TimePenaltyWrapper(venv)

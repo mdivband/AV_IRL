@@ -10,7 +10,7 @@ def train_airl_with_coeff(a: float, b: float, steps: int = 1000):
     env = make_vec_env(
         "highway-fast-v0",
         n_envs=1,
-        env_kwargs={"initial_spacing": 2.0},
+        env_kwargs={"ego_spacing": 3.0},
     )
     env = RewardScaleWrapper(env, scale=a)
     env = SafeDistanceRewardWrapper(env, weight=b)

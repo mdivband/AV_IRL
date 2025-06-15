@@ -33,7 +33,7 @@ if __name__ == '__main__':
             'highway-fast-v0',
             n_envs=n_cpu,
             vec_env_cls=SubprocVecEnv,
-            env_kwargs={'initial_spacing': 2.0},
+            env_kwargs={'ego_spacing': 3.0},
         )
         env = SafeDistanceRewardWrapper(env)
         env = TimePenaltyWrapper(env)
@@ -67,7 +67,7 @@ if __name__ == '__main__':
         'merge-v0',
         n_envs=n_cpu,
         vec_env_cls=SubprocVecEnv,
-        env_kwargs={'initial_spacing': 2.0},
+        env_kwargs={'ego_spacing': 3.0},
     )
     env_m = SafeDistanceRewardWrapper(env_m)
     env_m = TimePenaltyWrapper(env_m)
@@ -89,7 +89,7 @@ if __name__ == '__main__':
         'highway-v0',
         n_envs=n_cpu,
         vec_env_cls=SubprocVecEnv,
-        env_kwargs={'initial_spacing': 2.0},
+        env_kwargs={'ego_spacing': 3.0},
     )
     env_h2 = SafeDistanceRewardWrapper(env_h2)
     env_h2 = TimePenaltyWrapper(env_h2)

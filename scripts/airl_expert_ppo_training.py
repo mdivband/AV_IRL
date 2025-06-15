@@ -4,6 +4,7 @@ from stable_baselines3.common.env_util import make_vec_env
 from av_irl import SafeDistanceRewardWrapper, TimePenaltyWrapper
 from stable_baselines3.common.vec_env import SubprocVecEnv
 from gymnasium import Wrapper
+import argparse
 
 
 # class ConfigureWrapper(Wrapper):
@@ -18,10 +19,18 @@ from gymnasium import Wrapper
 #         })
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--ts",
+        type=int,
+        default=int(1e5),
+        help="Total timesteps to train the expert for each phase",
+    )
+    args = parser.parse_args()
     log_path = 'logs'
     #model_name = 'model2/expert_ppo_test_multi_train'
     model_name = 'model2/expert_ppo_mlt_hfst_m_h_old'
-    ts = int(1e5)
+    ts = args.ts
     train = True
     if train:
         n_cpu = 6
@@ -29,14 +38,18 @@ if __name__ == '__main__':
         # batch_size = 64
         # env = make_vec_env('highway-fast-v0', n_envs=n_cpu, vec_env_cls=SubprocVecEnv)
         
+        def wrap_env(e):
+            e = SafeDistanceRewardWrapper(e)
+            e = TimePenaltyWrapper(e)
+            return e
+
         env = make_vec_env(
             'highway-fast-v0',
             n_envs=n_cpu,
             vec_env_cls=SubprocVecEnv,
-            env_kwargs={'ego_spacing': 3.0},
+            env_kwargs={'config': {'ego_spacing': 3.0}},
+            wrapper_class=wrap_env,
         )
-        env = SafeDistanceRewardWrapper(env)
-        env = TimePenaltyWrapper(env)
 
     print('Building Model')
 
@@ -62,16 +75,14 @@ if __name__ == '__main__':
 
     # using a different env to continue train the expert, use merge env
     # env_m = make_vec_env('merge-v0', n_envs=n_cpu, vec_env_cls=SubprocVecEnv)
-
+    
     env_m = make_vec_env(
         'merge-v0',
         n_envs=n_cpu,
         vec_env_cls=SubprocVecEnv,
-        env_kwargs={'ego_spacing': 3.0},
+        env_kwargs={'config': {'ego_spacing': 3.0}},
+        wrapper_class=wrap_env,
     )
-    env_m = SafeDistanceRewardWrapper(env_m)
-    env_m = TimePenaltyWrapper(env_m)
-
 
     # expert2 = PPO.load(model_name)
     expert.set_env(env_m)
@@ -85,14 +96,14 @@ if __name__ == '__main__':
     # using a different env to continue train the expert, use more vehicles, 50->70
     # env_h2 = make_vec_env('highway-v0', n_envs=n_cpu, vec_env_cls=SubprocVecEnv, env_kwargs={'vehicles_count': 70})
     # env_h2 = make_vec_env('highway-v0', n_envs=n_cpu, vec_env_cls=SubprocVecEnv)
+    
     env_h2 = make_vec_env(
         'highway-v0',
         n_envs=n_cpu,
         vec_env_cls=SubprocVecEnv,
-        env_kwargs={'ego_spacing': 3.0},
+        env_kwargs={'config': {'ego_spacing': 3.0}},
+        wrapper_class=wrap_env,
     )
-    env_h2 = SafeDistanceRewardWrapper(env_h2)
-    env_h2 = TimePenaltyWrapper(env_h2)
 
     # expert3 = PPO.load(model_name)
     expert.set_env(env_h2)

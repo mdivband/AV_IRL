@@ -11,16 +11,19 @@ from av_irl import SafeDistanceRewardWrapper, TimePenaltyWrapper
 
 
 def train_airl(env_name, rollout_filename, learner:PPO, rng, ts):
+    def wrap_env(e, _):
+        e = SafeDistanceRewardWrapper(e)
+        e = TimePenaltyWrapper(e)
+        return e
+
     venv = make_vec_env(
         env_name,
         n_envs=8,
         parallel=True,
         rng=rng,
-        env_kwargs={"ego_spacing": 3.0},
+        env_kwargs={"config": {"ego_spacing": 3.0}},
+        post_wrappers=[wrap_env],
     )
-    venv = SafeDistanceRewardWrapper(venv)
-    venv = TimePenaltyWrapper(venv)
-
 
     learner.set_env(venv)
 
@@ -69,10 +72,9 @@ if __name__ == '__main__':
             n_envs=8,
             parallel=True,
             rng=rng,
-            env_kwargs={"ego_spacing": 3.0},
+            env_kwargs={"config": {"ego_spacing": 3.0}},
+            post_wrappers=[wrap_env],
         )
-        venv = SafeDistanceRewardWrapper(venv)
-        venv = TimePenaltyWrapper(venv)
 
 
         learner = PPO(

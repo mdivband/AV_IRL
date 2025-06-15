@@ -4,17 +4,19 @@ from typing import Optional
 
 def _distance_to_lead_from_env(env: gym.Env) -> Optional[float]:
     try:
-        front, _ = env.road.neighbour_vehicles(env.vehicle)
+        base = env.unwrapped
+        front, _ = base.road.neighbour_vehicles(base.vehicle)
         if front is None:
             return None
-        return env.vehicle.lane_distance_to(front)
+        return base.vehicle.lane_distance_to(front)
     except Exception:
         return None
 
 def _nearest_vehicle_distance(env: gym.Env) -> Optional[float]:
     try:
-        ego = env.vehicle
-        near = env.road.close_vehicles_to(ego, distance=float("inf"), count=1)
+        base = env.unwrapped
+        ego = base.vehicle
+        near = base.road.close_vehicles_to(ego, distance=float("inf"), count=1)
         if not near:
             return None
         other = near[0]

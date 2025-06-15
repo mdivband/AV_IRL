@@ -169,8 +169,8 @@ if cal_cor:
             if len(acts) != 30:
                 crash2 += 1
 
-    print(f"{sys.argv[1]} mean score: {np.mean(r)}")␊
-    print(f"{sys.argv[1]} median score: {np.median(r)}")␊
+    print(f"{sys.argv[1]} mean score: {np.mean(r)}")
+    print(f"{sys.argv[1]} median score: {np.median(r)}")
     print(f"mean safe distance penalty: {np.mean(safe2)}")
 
     ca, cr = [], []

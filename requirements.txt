@@ -3,3 +3,4 @@ imitation
 gymnasium
 numpy
 pytest
+highway-env

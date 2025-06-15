@@ -6,15 +6,19 @@ from imitation.util.util import make_vec_env
 from av_irl import SafeDistanceRewardWrapper, RewardScaleWrapper, TimePenaltyWrapper
 
 
-def train_airl_with_coeff(a: float, b: float, steps: int = 1000):
+def train_airl_with_coeff(a: float, b: float, steps: int = 1000):    
+    def wrap_env(e):
+        e = RewardScaleWrapper(e, scale=a)
+        e = SafeDistanceRewardWrapper(e, weight=b)
+        e = TimePenaltyWrapper(e)
+        return e
+
     env = make_vec_env(
         "highway-fast-v0",
         n_envs=1,
-        env_kwargs={"initial_spacing": 2.0},
+        env_kwargs={"config": {"ego_spacing": 3.0}},
+        wrapper_class=wrap_env,
     )
-    env = RewardScaleWrapper(env, scale=a)
-    env = SafeDistanceRewardWrapper(env, weight=b)
-    env = TimePenaltyWrapper(env)
 
     learner = PPO("MlpPolicy", env, n_steps=64, batch_size=64, verbose=0)
     reward_net = BasicShapedRewardNet(env.observation_space, env.action_space)

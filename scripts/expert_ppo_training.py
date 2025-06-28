@@ -5,18 +5,12 @@ from av_irl import SafeDistanceRewardWrapper, TimePenaltyWrapper
 from stable_baselines3.common.vec_env import SubprocVecEnv
 from gymnasium import Wrapper
 import argparse
+from highway_env.envs.merge_env import MergeEnv
 
 
-# class ConfigureWrapper(Wrapper):
-#     """
-#     Wrapper to configure the environment
-#     """
-#     def __init__(self, env):
-#         super(ConfigureWrapper, self).__init__(env)
-#         self.env.configure({
-#             #"vehicles_count": 70,
-#             "vehicles_density": 1.5,
-#         })
+def _silent_is_terminated(self) -> bool:
+    return self.vehicle.crashed or bool(self.vehicle.position[0] > 370)
+MergeEnv._is_terminated = _silent_is_terminated
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -28,8 +22,7 @@ if __name__ == '__main__':
     )
     args = parser.parse_args()
     log_path = 'logs'
-    #model_name = 'model2/expert_ppo_test_multi_train'
-    model_name = 'model2/expert_ppo_mlt_hfst_m_h_old'
+    model_name = 'model/expert_ppo_mlt_h1_m_h2'
     ts = args.ts
     train = True
     if train:

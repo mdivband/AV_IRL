@@ -8,19 +8,28 @@ from av_irl import SafeDistanceRewardWrapper, TimePenaltyWrapper
 from imitation.rewards.reward_wrapper import RewardVecEnvWrapper
 from stable_baselines3 import PPO
 from stable_baselines3.common.evaluation import evaluate_policy
+from highway_env.envs.merge_env import MergeEnv
+import os, logging
+import argparse
 
-def train_gail(env_name, rollout_filename, learner: PPO, rng, ts):
-    def wrap_env(e, _):
-        e = SafeDistanceRewardWrapper(e)
-        e = TimePenaltyWrapper(e)
-        return e
+def _silent_is_terminated(self) -> bool:
+    return self.vehicle.crashed or bool(self.vehicle.position[0] > 370)
+MergeEnv._is_terminated = _silent_is_terminated
+
+def wrap_env(env, _):
+    env = SafeDistanceRewardWrapper(env)
+    env = TimePenaltyWrapper(env)
+    return env
+
+
+def train_gail(env_name, rollout_filename, learner: PPO, rng, ts, log_path: str):
 
     venv = make_vec_env(
         env_name,
         n_envs=8,
         parallel=True,
         rng=rng,
-        env_kwargs={"config": {"ego_spacing": 3.0}},
+        env_make_kwargs={"config": {"ego_spacing": 3.0}},
         post_wrappers=[wrap_env],
     )
 
@@ -30,38 +39,57 @@ def train_gail(env_name, rollout_filename, learner: PPO, rng, ts):
         venv.observation_space, venv.action_space, normalize_input_layer=RunningNorm
     )
     venv = RewardVecEnvWrapper(venv, reward_net.predict_processed)
-    print(f"open rollouts file: {rollout_filename}")
+    logging.info(f"open rollouts file: {rollout_filename}")
 
     with open(rollout_filename, "rb") as f:
         loaded_rollouts = pickle.load(f)
 
-    print(f"loaded_rollouts length: {len(loaded_rollouts)}")
+    
+    n_transitions = sum(len(traj) for traj in loaded_rollouts)
+    demo_batch = min(1024, n_transitions)
+    logging.info(
+        "loaded %d trajectories totalling %d transitions, demo batch size %d",
+        len(loaded_rollouts),
+        n_transitions,
+        demo_batch,
+    )
+    
     gail_trainer = GAIL(
         demonstrations=loaded_rollouts,
-        demo_batch_size=1024,
+        demo_batch_size=demo_batch,
         gen_replay_buffer_capacity=2048,
         n_disc_updates_per_round=2,
         venv=venv,
         gen_algo=learner,
         reward_net=reward_net,
+        log_dir=log_path,
+        allow_variable_horizon=True,
     )
 
     learner_reward_before_training, _ = evaluate_policy(learner, venv, 30)
-    print(f"Reward before training: {learner_reward_before_training}")
+    logging.info(f"Reward before training: {learner_reward_before_training}")
     gail_trainer.train(int(ts))
     learner_reward_after_training, _ = evaluate_policy(learner, venv, 30)
-    print(f"Reward after training: {learner_reward_after_training}")
+    logging.info(f"Reward after training: {learner_reward_after_training}")
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
+
+    parser = argparse.ArgumentParser(description="train a gail learner")
+    parser.add_argument("--timesteps", default= 1e5, help="timesteps")
+    args = parser.parse_args()   
+
     rng = np.random.default_rng()
-    log_path = '/lyceum/tg4u22/project/output/'
+    # log_path = '/lyceum/tg4u22/project/output/'
+    log_path = os.path.join(os.getcwd(), 'output')
+
     suffixes = ['1k', '2k', '4k', '8k', '16k', '32k', '64k']
     n_cpu = 6
     batch_size = 512
-    ts = int(2e5)
+    ts = int(args.timesteps)
 
     for suffix in suffixes:
-        print(f"Training for suffix: {suffix}")
+        logging.info(f"Training for suffix: {suffix}")
 
         env_name_h = "highway-fast-v0"
 
@@ -70,7 +98,7 @@ if __name__ == '__main__':
             n_envs=8,
             parallel=True,
             rng=rng,
-            env_kwargs={"config": {"ego_spacing": 3.0}},
+            env_make_kwargs={"config": {"ego_spacing": 3.0}},
             post_wrappers=[wrap_env],
         )
 
@@ -90,19 +118,24 @@ if __name__ == '__main__':
 
         train_gail(
             env_name="highway-fast-v0",
-            rollout_filename=f"/lyceum/tg4u22/project/rollouts_1_hf_{suffix}.pkl",
+            # rollout_filename=f"/lyceum/tg4u22/project/rollouts_1_hf_{suffix}.pkl",
+            rollout_filename='./rollout/rollout_ts100_h2.pkl',
             learner=learner,
             rng=rng,
-            ts=ts
+            ts=ts,
+            log_path=log_path,
         )
 
         train_gail(
             env_name="merge-v0",
-            rollout_filename=f"/lyceum/tg4u22/project/rollouts_2_m2_{suffix}.pkl",
+            # rollout_filename=f"/lyceum/tg4u22/project/rollouts_2_m2_{suffix}.pkl",
+            rollout_filename='./rollout/rollout_ts100_h2.pkl',
             learner=learner,
             rng=rng,
-            ts=ts
+            ts=ts,
+            log_path=log_path,
         )
 
         model_name_suffix=f"e{suffix}_ts{ts}_ts{ts}_mlt_old"
-        learner.save(f'/lyceum/tg4u22/project/model3/gail_learner_august_{model_name_suffix}')
+        # learner.save(f'/lyceum/tg4u22/project/model3/gail_learner_august_{model_name_suffix}')
+        learner.save('model/gail_learner')

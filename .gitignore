@@ -2,6 +2,7 @@ __pycache__/
 *.pyc
 *.pkl
 logs/
-model2/
+model/
 output/
+rollout/
 *.egg-info/

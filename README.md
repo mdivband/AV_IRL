@@ -25,6 +25,7 @@ We recommend using Miniconda to manage the Python environment:
 conda create -n av_irl python=3.10
 conda activate av_irl
 pip install -r requirements.txt
+pip install -e .
 ```
 
 Alternatively, a standard virtual environment works as well:
@@ -33,7 +34,10 @@ Alternatively, a standard virtual environment works as well:
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+pip install -e .
 ```
+
+Installing in editable mode ensures the `av_irl` package is importable when running scripts.
 
 ## Usage
 

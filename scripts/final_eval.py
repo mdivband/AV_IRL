@@ -7,8 +7,9 @@ from collections import Counter
 from av_irl import calculate_safe_distance
 
 
-expert = PPO.load('model2/expert_ppo_mlt_hfst_m_h_old') # 22.15 22.16 12.775
-learner = PPO.load("model2/gail_learner_august_e8k_ts100000_ts100000_mlt_old") # reward:20.15 22 12.45
+expert = PPO.load('model/expert_ppo_mlt_h1_m_h2') # 22.15 22.16 12.775
+# learner = PPO.load("model/gail_learner_august_e8k_ts100000_ts100000_mlt_old") # reward:20.15 22 12.45
+learner = PPO.load("model/expert_ppo_mlt_h1_m_h2")
 
 cal_cor = False
 

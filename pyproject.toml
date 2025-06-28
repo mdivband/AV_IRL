@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "av_irl"
+version = "0.0.1"
+requires-python = ">=3.8"
+dependencies = [
+    "stable-baselines3",
+    "imitation",
+    "gymnasium",
+    "numpy",
+    "pytest",
+    "highway-env",
+]
+
+[tool.setuptools.packages.find]
+include = ["av_irl*", "scripts*"]

@@ -6,3 +6,4 @@ model/
 output/
 rollout/
 *.egg-info/
+tmp/

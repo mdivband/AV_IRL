@@ -7,7 +7,7 @@ from imitation.util.util import make_vec_env
 from imitation.rewards.reward_wrapper import RewardVecEnvWrapper
 from stable_baselines3 import PPO
 from stable_baselines3.common.evaluation import evaluate_policy
-from av_irl import SafeDistanceRewardWrapper, TimePenaltyWrapper
+from av_irl import ZeroRewardWrapper
 import os
 import logging
 from highway_env.envs.merge_env import MergeEnv
@@ -18,17 +18,8 @@ def _silent_is_terminated(self) -> bool:
     return self.vehicle.crashed or bool(self.vehicle.position[0] > 370)
 MergeEnv._is_terminated = _silent_is_terminated
 
-def wrap_env(env, _):
-    env = SafeDistanceRewardWrapper(env)
-    env = TimePenaltyWrapper(env)
-    return env
 
-
-def train_airl(env_name, rollout_filename, learner:PPO, rng, ts, log_path: str):
-    # def wrap_env(e, _):
-    #     e = SafeDistanceRewardWrapper(e)
-    #     e = TimePenaltyWrapper(e)
-    #     return e
+def train_airl(env_name, rollout_filename, learner: PPO, rng, ts, log_path: str):
 
     venv = make_vec_env(
         env_name,
@@ -36,7 +27,7 @@ def train_airl(env_name, rollout_filename, learner:PPO, rng, ts, log_path: str):
         parallel=True,
         rng=rng,
         env_make_kwargs={"config": {"ego_spacing": 3.0}},
-        post_wrappers=[wrap_env],
+        post_wrappers=[lambda e, _: ZeroRewardWrapper(e)],
     )
 
     learner.set_env(venv)
@@ -81,16 +72,16 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
     
     parser = argparse.ArgumentParser(description="train an airl learner")
-    parser.add_argument("--timesteps", default= 1e5, help="timesteps")
+    parser.add_argument("--ts", default= 1e5, help="timesteps")
     args = parser.parse_args()   
     
     rng = np.random.default_rng()
     # log_path = '/lyceum/tg4u22/project/output/'
     log_path = os.path.join(os.getcwd(), 'output')
-    suffixes = ['1k', '2k', '4k', '8k', '16k', '32k', '64k']
+    suffixes = ['1k', '2k', '4k', '8k', '16k', '32k', '64k', '128k']
     n_cpu = 6
     batch_size = 512
-    ts = int(args.timesteps)
+    ts = int(args.ts)
 
     for suffix in suffixes:
         logging.info(f"Training for suffix: {suffix}")
@@ -103,7 +94,7 @@ if __name__ == '__main__':
             parallel=True,
             rng=rng,
             env_make_kwargs={"config": {"ego_spacing": 3.0}},
-            post_wrappers=[wrap_env],
+            post_wrappers=[lambda e, _: ZeroRewardWrapper(e)],
         )
 
 

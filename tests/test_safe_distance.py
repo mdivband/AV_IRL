@@ -7,7 +7,7 @@ from av_irl.safe_distance import (
     RewardScaleWrapper,
     TimePenaltyWrapper,
 )
-
+from av_irl import DrivingStyleRewardWrapper, ZeroRewardWrapper
 
 def test_calculate_safe_distance_distance():
     class DummyVehicle:
@@ -194,3 +194,45 @@ def test_calculate_safe_distance_side_vehicle():
     wrapped = SafeDistanceRewardWrapper(env)
     obs, reward, done, truncated, info = wrapped.step(0)
     assert pytest.approx(reward, 1e-5) == -1.0
+    
+
+def test_driving_style_wrapper():
+    class DummyVehicle:
+        def __init__(self):
+            self.speed = 2.0
+
+    class DummyEnv(gym.Env):
+        def __init__(self):
+            self.action_space = gym.spaces.Discrete(1)
+            self.observation_space = gym.spaces.Box(low=0, high=1, shape=(1,))
+            self.vehicle = DummyVehicle()
+
+        def reset(self, *, seed=None, options=None):
+            return [0.0], {}
+
+        def step(self, action):
+            return [0.0], 0.0, True, False, {"crashed": True}
+
+    env = DummyEnv()
+    wrapper = DrivingStyleRewardWrapper(env, a=1.0, b=2.0)
+    obs, reward, done, truncated, info = wrapper.step(0)
+    assert reward == 1.0 * 2.0 - 2.0 * 1.0
+
+
+def test_zero_reward_wrapper():
+    class DummyEnv(gym.Env):
+        def __init__(self):
+            self.action_space = gym.spaces.Discrete(1)
+            self.observation_space = gym.spaces.Box(low=0, high=1, shape=(1,))
+
+        def reset(self, *, seed=None, options=None):
+            return [0.0], {}
+
+        def step(self, action):
+            return [0.0], 5.0, False, False, {}
+
+    env = DummyEnv()
+    wrapped = ZeroRewardWrapper(env)
+    obs, reward, done, truncated, info = wrapped.step(0)
+    assert reward == 0.0
+

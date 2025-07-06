@@ -8,10 +8,10 @@ set -e
 mkdir -p model rollout logs
 
 # Expert coefficient pairs (a,b)
-AS=(0.2 0.5 0.8)
-BS=(0.8 0.5 0.2)
+AS=(0.3 0.5 0.7)
+BS=(0.7 0.5 0.3)
 
-ROLLOUT_SIZES=(32000 64000 256000)
+ROLLOUT_SIZES=(8000 32000 64000 128000)
 LEARNER_TS=(100000 200000)
 ENVS=("highway-fast-v0" "merge-v0")
 
@@ -22,7 +22,7 @@ for i in ${!AS[@]}; do
   a=${AS[$i]}
   b=${BS[$i]}
   log "Training expert a=$a b=$b"
-  python scripts/expert_ppo_training.py --ts 2000000 --a "$a" --b "$b" \
+  python scripts/expert_ppo_training.py --ts 1200000 --a "$a" --b "$b" \
     > "logs/expert_a${a}_b${b}.log" 2>&1
   mv model/expert_ppo_mlt_h1_m_h2.zip "model/expert_a${a}_b${b}.zip"
 

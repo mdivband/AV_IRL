@@ -6,14 +6,14 @@ import gymnasium as gym
 import numpy as np
 from stable_baselines3 import PPO
 
-from av_irl import calculate_safe_distance
-
-
+# Default model locations. Override on the command line if needed.
 DEFAULT_EXPERT_PATH = "model/expert_ppo_mlt_h1_m_h2"
 DEFAULT_LEARNER_PATH = "model/expert_ppo_mlt_h1_m_h2"
 
 
 def make_env(env_code: str) -> gym.Env:
+    """Create an unwrapped evaluation environment."""
+
     if env_code == "r":
         return gym.make("roundabout-v0", render_mode="rgb_array")
     if env_code == "i":
@@ -41,42 +41,45 @@ def generate_seeds(n: int) -> List[int]:
     return [rng.randrange(0, 2 ** 32) for _ in range(n)]
 
 
-def run_episode(model: PPO, env: gym.Env, seed: int) -> Tuple[float, float, List[Tuple[int, int]], List[Tuple[int, float]]]:
+def run_episode(
+    model: PPO, env: gym.Env, seed: int, render: bool = False
+) -> Tuple[float, List[Tuple[int, int]], List[Tuple[int, float]]]:
+    """Run one episode and return the raw environment rewards."""
+
     obs, info = env.reset(seed=seed)
     done = truncated = False
     total_reward = 0.0
     actions = []
     rewards = []
-    penalty = 0.0
     step = 0
     while not (done or truncated):
         action, _ = model.predict(obs, deterministic=True)
         obs, reward, done, truncated, info = env.step(action)
-        env.render()
+        if render:
+            env.render()
         actions.append((step, int(action)))
         rewards.append((step, reward))
         total_reward += reward
-        penalty += calculate_safe_distance(info)
         step += 1
-    return total_reward, penalty, actions, rewards
+    return total_reward, actions, rewards
 
 
-def evaluate(model: PPO, env: gym.Env, seeds: List[int]):
+def evaluate(model: PPO, env: gym.Env, seeds: List[int], render: bool = False):
+    """Return episode scores and optionally count crashes."""
+
     scores = []
-    penalties = []
     actions = []
     rewards = []
     crashes = 0
     for seed in seeds:
-        score, penalty, act, rew = run_episode(model, env, seed)
+        score, act, rew = run_episode(model, env, seed, render=render)
         scores.append(score)
-        penalties.append(penalty)
         actions.append(act)
         rewards.append(rew)
         expected = 17 if env.spec.id == "merge-v0" else 30
         if len(act) != expected:
             crashes += 1
-    return scores, penalties, actions, rewards, crashes
+    return scores, actions, rewards, crashes
 
 
 def compute_correlations(expert_data, learner_data, seeds: List[int]):
@@ -129,6 +132,11 @@ def main():
         default=DEFAULT_LEARNER_PATH,
         help="Path to the learner model",
     )
+    parser.add_argument(
+        "--render",
+        action="store_true",
+        help="Render the environment during evaluation",
+    )
     args = parser.parse_args()
 
     seeds = generate_seeds(args.num_seeds)
@@ -137,25 +145,25 @@ def main():
     learner = PPO.load(args.learner_path)
 
     if args.agent == "e":
-        scores, penalties, _, _, _ = evaluate(expert, env, seeds)
+        scores, _, _, _ = evaluate(expert, env, seeds, render=args.render)
         print(f"Expert mean score: {np.mean(scores):.2f}")
         print(f"Expert median score: {np.median(scores):.2f}")
-        print(f"Mean safe distance penalty: {np.mean(penalties):.2f}")
     elif args.agent == "l":
-        scores, penalties, _, _, _ = evaluate(learner, env, seeds)
+        scores, _, _, _ = evaluate(learner, env, seeds, render=args.render)
         print(f"Learner mean score: {np.mean(scores):.2f}")
         print(f"Learner median score: {np.median(scores):.2f}")
-        print(f"Mean safe distance penalty: {np.mean(penalties):.2f}")
     else:
-        exp_scores, exp_penalties, exp_actions, exp_rewards, _ = evaluate(expert, env, seeds)
-        ler_scores, ler_penalties, ler_actions, ler_rewards, _ = evaluate(learner, env, seeds)
+        exp_scores, exp_actions, exp_rewards, _ = evaluate(
+            expert, env, seeds, render=args.render
+        )
+        ler_scores, ler_actions, ler_rewards, _ = evaluate(
+            learner, env, seeds, render=args.render
+        )
         action_corr, reward_corr, valid_seeds = compute_correlations(
             (exp_actions, exp_rewards), (ler_actions, ler_rewards), seeds
         )
         print(f"Expert mean score: {np.mean(exp_scores):.2f}")
         print(f"Learner mean score: {np.mean(ler_scores):.2f}")
-        print(f"Expert mean penalty: {np.mean(exp_penalties):.2f}")
-        print(f"Learner mean penalty: {np.mean(ler_penalties):.2f}")
         if action_corr:
             print(f"Action correlation median: {np.median(action_corr):.2f}")
             print(f"Reward correlation median: {np.median(reward_corr):.2f}")

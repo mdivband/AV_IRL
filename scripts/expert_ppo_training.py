@@ -1,3 +1,6 @@
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="pygame.pkgdata")
+
 from stable_baselines3 import PPO
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.env_util import make_vec_env
@@ -56,7 +59,7 @@ if __name__ == '__main__':
     parser.add_argument(
         "--patience",
         type=int,
-        default=5,
+        default=3,
         help="Evaluations to wait for improvement before early stopping",
     )
     args = parser.parse_args()
@@ -79,20 +82,16 @@ if __name__ == '__main__':
         'highway-fast-v0',
         n_envs=n_cpu,
         vec_env_cls=SubprocVecEnv,
-        env_kwargs={'config': {'ego_spacing': 3.0}},
+        env_kwargs={'config': {'ego_spacing': 3.0, 'simulation_frequency': 7, 'policy_frequency': 2, 'duration': 15}},
         wrapper_class=wrap_env,
     )
 
     print('Building Model')
 
-    batch_size = 1024
+    batch_size = 2048
     n_steps = 8192 
-    policy_kwargs = dict(
-        net_arch=dict(
-            pi=[1024, 1024, 512],
-            vf=[1024, 1024, 512]
-        )
-    )
+    policy_kwargs = dict(net_arch=dict(pi=[512, 256], vf=[512, 256]))
+
 
     expert = PPO(
         'MlpPolicy',
@@ -102,18 +101,20 @@ if __name__ == '__main__':
         batch_size=batch_size,
         n_epochs=10,
         learning_rate=5e-4,
-        gamma=0.95,
+        gamma=0.9,
         verbose=2,
         tensorboard_log=log_path,
         ent_coef=0.01,
         device='cuda')
 
     print('Training in highway 1')
+    BATCH_STEPS = n_cpu * n_steps
+    eval_freq   = 2*BATCH_STEPS
     eval_env = make_vec_env(
         'highway-fast-v0',
-        n_envs=1,
+        n_envs=4,
         vec_env_cls=SubprocVecEnv,
-        env_kwargs={'config': {'ego_spacing': 3.0}},
+        env_kwargs={'config': {'ego_spacing': 3.0, 'simulation_frequency': 7, 'policy_frequency': 2, 'duration': 15}},
         wrapper_class=wrap_env,
     )
     stop_callback = StopTrainingOnNoModelImprovementAndLog(patience, verbose=1)
@@ -121,7 +122,7 @@ if __name__ == '__main__':
         eval_env,
         callback_on_new_best=stop_callback,
         eval_freq=eval_freq,
-        n_eval_episodes=5,
+        n_eval_episodes=3,
         verbose=1,
     )
     expert.learn(total_timesteps=ts, callback=eval_callback)
@@ -137,7 +138,7 @@ if __name__ == '__main__':
         'merge-v0',
         n_envs=n_cpu,
         vec_env_cls=SubprocVecEnv,
-        env_kwargs={'config': {'ego_spacing': 3.0}},
+        env_kwargs={'config': {'ego_spacing': 3.0, 'simulation_frequency': 7, 'policy_frequency': 2, 'duration': 15}},
         wrapper_class=wrap_env,
     )
 
@@ -145,9 +146,9 @@ if __name__ == '__main__':
     print('Training in merge')
     eval_env = make_vec_env(
         'merge-v0',
-        n_envs=1,
+        n_envs=4,
         vec_env_cls=SubprocVecEnv,
-        env_kwargs={'config': {'ego_spacing': 3.0}},
+        env_kwargs={'config': {'ego_spacing': 3.0, 'simulation_frequency': 7, 'policy_frequency': 2, 'duration': 15}},
         wrapper_class=wrap_env,
     )
     stop_callback = StopTrainingOnNoModelImprovementAndLog(patience, verbose=1)
@@ -155,10 +156,10 @@ if __name__ == '__main__':
         eval_env,
         callback_on_new_best=stop_callback,
         eval_freq=eval_freq,
-        n_eval_episodes=5,
+        n_eval_episodes=3,
         verbose=1,
     )
-    expert.learn(total_timesteps=ts, callback=eval_callback)
+    expert.learn(total_timesteps=int(ts/4), callback=eval_callback)
     print("Trained timesteps (scenario 2, merge-v0):", expert.num_timesteps)
     if stop_callback.stop_step is not None:
         print(f"Training stopped early at {stop_callback.stop_step} steps")
@@ -170,7 +171,7 @@ if __name__ == '__main__':
         'highway-v0',
         n_envs=n_cpu,
         vec_env_cls=SubprocVecEnv,
-        env_kwargs={'config': {'ego_spacing': 3.0}},
+        env_kwargs={'config': {'ego_spacing': 3.0, 'simulation_frequency': 7, 'policy_frequency': 2, 'duration': 15}},
         wrapper_class=wrap_env,
     )
 
@@ -178,9 +179,9 @@ if __name__ == '__main__':
     print('Training in highway 2')
     eval_env = make_vec_env(
         'highway-v0',
-        n_envs=1,
+        n_envs=4,
         vec_env_cls=SubprocVecEnv,
-        env_kwargs={'config': {'ego_spacing': 3.0}},
+        env_kwargs={'config': {'ego_spacing': 3.0, 'simulation_frequency': 7, 'policy_frequency': 2, 'duration': 15}},
         wrapper_class=wrap_env,
     )
     stop_callback = StopTrainingOnNoModelImprovementAndLog(patience, verbose=1)
@@ -188,7 +189,7 @@ if __name__ == '__main__':
         eval_env,
         callback_on_new_best=stop_callback,
         eval_freq=eval_freq,
-        n_eval_episodes=5,
+        n_eval_episodes=3,
         verbose=1,
     )
     expert.learn(total_timesteps=ts, callback=eval_callback)

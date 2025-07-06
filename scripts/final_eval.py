@@ -1,222 +1,167 @@
-from stable_baselines3 import PPO
+import argparse
+import random
+from typing import List, Tuple
+
 import gymnasium as gym
 import numpy as np
-import random
-import sys
-from collections import Counter
+from stable_baselines3 import PPO
+
 from av_irl import calculate_safe_distance
 
 
-expert = PPO.load('model/expert_ppo_mlt_h1_m_h2') # 22.15 22.16 12.775
-# learner = PPO.load("model/gail_learner_august_e8k_ts100000_ts100000_mlt_old") # reward:20.15 22 12.45
-learner = PPO.load("model/expert_ppo_mlt_h1_m_h2")
-
-cal_cor = False
-
-if sys.argv[1] == "e":
-    model = expert
-elif sys.argv[1] == "l":
-    model = learner
-elif sys.argv[1] == "c":
-    cal_cor = True
-    model = expert
-
-if sys.argv[2] == "r":
-    env = gym.make('roundabout-v0', render_mode='rgb_array')
-elif sys.argv[2] == "i":
-    env = gym.make('intersection-v1', render_mode='rgb_array')
-elif sys.argv[2] == "h2":
-    env = gym.make('highway-v0', render_mode='rgb_array')
-elif sys.argv[2] == "h":
-    env = gym.make('highway-fast-v0', render_mode='rgb_array')
-    # env = gym.make('highway-v0', render_mode='rgb_array')
-    env.config["vehicles_count"] = 30
-    env.config["vehicles_density"] = 1.5
-elif sys.argv[2] == "h3":
-    env = gym.make('highway-v0', render_mode='rgb_array')
-    env.config["vehicles_count"] = 60
-    env.config["vehicles_density"] = 1.2
-    env.config["lanes_count"] = 5
-elif sys.argv[2] == "m":
-    env = gym.make('merge-v0', render_mode='rgb_array')
+DEFAULT_EXPERT_PATH = "model/expert_ppo_mlt_h1_m_h2"
+DEFAULT_LEARNER_PATH = "model/expert_ppo_mlt_h1_m_h2"
 
 
-s = [3,12,15,22,26,33,37,41,48,50,56,63,67,71,76,85,88,92,97,137,210]
-rnd = 2
+def make_env(env_code: str) -> gym.Env:
+    if env_code == "r":
+        return gym.make("roundabout-v0", render_mode="rgb_array")
+    if env_code == "i":
+        return gym.make("intersection-v1", render_mode="rgb_array")
+    if env_code == "h2":
+        return gym.make("highway-v0", render_mode="rgb_array")
+    if env_code == "h":
+        env = gym.make("highway-fast-v0", render_mode="rgb_array")
+        env.config["vehicles_count"] = 30
+        env.config["vehicles_density"] = 1.5
+        return env
+    if env_code == "h3":
+        env = gym.make("highway-v0", render_mode="rgb_array")
+        env.config["vehicles_count"] = 60
+        env.config["vehicles_density"] = 1.2
+        env.config["lanes_count"] = 5
+        return env
+    if env_code == "m":
+        return gym.make("merge-v0", render_mode="rgb_array")
+    raise ValueError(f"Unknown environment code: {env_code}")
 
 
-def generate_seeds(n):
-    return [random.randint(0, 4294967295) for _ in range(n)]
-
-if len(sys.argv) == 4:
-    arg_seed = sys.argv[3]
-    s = generate_seeds(int(arg_seed))
-
-s = [3693441017, 1379311007, 345399021, 3866570930, 1440486917, 433119437, 941627344, 1392760376, 592577554, 1264255133, 741198289, 85302750, 1410076489, 211663658, 989135185, 1570779053, 507304143, 3495408044, 1103807189, 1596059065, 42805350, 521199278, 3329126507, 2708077417, 3106557841, 1064915112, 376899085, 2323231202, 657042672, 2162942099, 2170917990, 1832670571, 174373067, 2024159871, 2910350503, 3654751374, 3083785470, 32320730, 4258597804, 913536181, 1610817831, 3026220863, 945250660, 571319771, 271808935, 306855096, 4053625423, 739177828, 2960126609, 3657911354, 870113469, 3261250014, 3604468301, 696297419, 2865412639, 1168047477, 1445881685, 3788576699, 3863289598, 303639681, 3238666515, 1256008546, 2918054877, 1196236626, 445641807, 3220468212, 3696816633, 2661084908, 1106403187, 28265912, 4072718319, 1657821793, 1892593215, 2596180305, 2272646799, 3761416187, 2994571515, 1023992424, 3244354341, 667574573, 147697477, 902146094, 1340136995, 2400939166, 3673613530, 455156064, 1303219402, 1080440186, 1213997960, 3841494078, 1089289909, 1395852106, 887900089, 2140352646, 3875150970, 3302560521, 2600555133, 80910033, 3341670772, 2324072196]
-
-rnd = len(s)
+def generate_seeds(n: int) -> List[int]:
+    rng = random.Random(0)
+    return [rng.randrange(0, 2 ** 32) for _ in range(n)]
 
 
-r = []
-dl = []
-rl = []
-crash = 0
-safe = []
-
-for i in range(rnd):
-    obs, info = env.reset(seed=s[i])
-    #obs, info = env.reset(seed=48)
-    #obs, info = env.reset()
+def run_episode(model: PPO, env: gym.Env, seed: int) -> Tuple[float, float, List[Tuple[int, int]], List[Tuple[int, float]]]:
+    obs, info = env.reset(seed=seed)
     done = truncated = False
-    score = 0
-    acts = []
-    rs = []
-    n = 0
-    data = []
-    data_r = []
-    pen = 0.0
+    total_reward = 0.0
+    actions = []
+    rewards = []
+    penalty = 0.0
+    step = 0
     while not (done or truncated):
-        action, _states = model.predict(obs, deterministic=True)
-        acts.append(action)
+        action, _ = model.predict(obs, deterministic=True)
         obs, reward, done, truncated, info = env.step(action)
-        rs.append(reward)
-        pen += calculate_safe_distance(info)
-        # print(info)
-        tmp = (n,int(action))
-        score += reward
-        tmp2 = (n, reward)
         env.render()
-        n += 1
-        data.append(tmp)
-        data_r.append(tmp2)
-    r.append(score)
-    safe.append(pen)
-
-    # print(f"score: {score}, seed:{s[i]}")
-    # print(acts)
-    dl.append(data)
-    rl.append(data_r)
-    print(acts)
-    print(rs)
-
-    if sys.argv[2] == "m":
-        if len(acts) != 17:
-            crash += 1
-    else:
-        if len(acts) != 30:
-            crash += 1
+        actions.append((step, int(action)))
+        rewards.append((step, reward))
+        total_reward += reward
+        penalty += calculate_safe_distance(info)
+        step += 1
+    return total_reward, penalty, actions, rewards
 
 
+def evaluate(model: PPO, env: gym.Env, seeds: List[int]):
+    scores = []
+    penalties = []
+    actions = []
+    rewards = []
+    crashes = 0
+    for seed in seeds:
+        score, penalty, act, rew = run_episode(model, env, seed)
+        scores.append(score)
+        penalties.append(penalty)
+        actions.append(act)
+        rewards.append(rew)
+        expected = 17 if env.spec.id == "merge-v0" else 30
+        if len(act) != expected:
+            crashes += 1
+    return scores, penalties, actions, rewards, crashes
 
-    # print(data_r)
-    # print(i, len(acts))
 
-#print(dl)
-#print(rl)
-
-print(f"{sys.argv[1]} mean score: {np.mean(r)}")
-print(f"{sys.argv[1]} median score: {np.median(r)}")
-print(f"mean safe distance penalty: {np.mean(safe)}")
-
-if cal_cor:
-    crash2 = 0
-    r = []
-    dl2 = []
-    rl2 = []
-    safe2 = []
-    model = learner
-    for i in range(rnd):
-        obs, info = env.reset(seed=s[i])
-
-        #obs, info = env.reset(seed=48)
-        #obs, info = env.reset()
-        done = truncated = False
-        score = 0
-        acts = []
-        n = 0
-        data = []
-        data_r = []
-        rs = []
-        pen = 0.0
-        while not (done or truncated):
-            action, _states = model.predict(obs, deterministic=True)
-            acts.append(action)
-            obs, reward, done, truncated, info = env.step(action)
-            rs.append(reward)
-            pen += calculate_safe_distance(info)
-            #print(info)
-            tmp = (n,int(action))
-            score += reward
-            tmp2 = (n, reward)
-            env.render()
-            n += 1
-            data.append(tmp)
-            data_r.append(tmp2)
-        r.append(score)
-        safe2.append(pen)
-        # print(f"score: {score}, seed:{s[i]}")
-        # print(acts)
-        dl2.append(data)
-        rl2.append(data_r)
-        # print(data)
-        # print(data_r)
-        # print(i, len(acts))
-        print(acts)
-        print(rs)
-        if sys.argv[2] == "m":
-            if len(acts) != 17:
-                crash2 += 1
-        else:
-            if len(acts) != 30:
-                crash2 += 1
-
-    print(f"{sys.argv[1]} mean score: {np.mean(r)}")
-    print(f"{sys.argv[1]} median score: {np.median(r)}")
-    print(f"mean safe distance penalty: {np.mean(safe2)}")
-
-    ca, cr = [], []
-    ns = []
-    for i in range(len(dl2)):
-        if len(dl2[i]) != len(dl[i]):
-            print(f"seed {s[i]}, len(e): {len(dl[i])}, len(l): {len(dl2[i])}")
+def compute_correlations(expert_data, learner_data, seeds: List[int]):
+    expert_actions, expert_rewards = expert_data
+    learner_actions, learner_rewards = learner_data
+    action_corr = []
+    reward_corr = []
+    valid_seeds = []
+    for idx, (ea, la) in enumerate(zip(expert_actions, learner_actions)):
+        if len(ea) != len(la):
+            print(f"seed {seeds[idx]}, len(e): {len(ea)}, len(l): {len(la)}")
             continue
-        x1, y1 = zip(*dl[i])
-        x2, y2 = zip(*dl2[i])
-
+        y1 = [v for _, v in ea]
+        y2 = [v for _, v in la]
         if np.var(y1) == 0 or np.var(y2) == 0:
             continue
+        action_corr.append(float(np.corrcoef(y1, y2)[0, 1]))
+        valid_seeds.append(seeds[idx])
+        y1 = [v for _, v in expert_rewards[idx]]
+        y2 = [v for _, v in learner_rewards[idx]]
+        reward_corr.append(float(np.corrcoef(y1, y2)[0, 1]))
+    return action_corr, reward_corr, valid_seeds
 
-        correlation_coefficient = round(np.corrcoef(y1, y2)[0, 1], 4)
-        ca.append(correlation_coefficient)
-        ns.append(s[i])
 
-        x1, y1 = zip(*rl[i])
-        x2, y2 = zip(*rl2[i])
-        correlation_coefficient = round(np.corrcoef(y1, y2)[0, 1], 4)
-        cr.append(correlation_coefficient)
-    if len(ca) != 0:
-        max_a = max(ca)
-        min_a = min(ca)
-        max_r = max(cr)
-        min_r = min(cr)
+def main():
+    parser = argparse.ArgumentParser(description="Evaluate trained policies")
+    parser.add_argument(
+        "agent",
+        choices=["e", "l", "c"],
+        help="Agent to evaluate: expert(e), learner(l) or compare(c)",
+    )
+    parser.add_argument(
+        "env",
+        choices=["r", "i", "h", "h2", "h3", "m"],
+        help="Environment code: r=roundabout, i=intersection, h=highway-fast, h2=highway, h3=highway variant, m=merge",
+    )
+    parser.add_argument(
+        "--num-seeds",
+        type=int,
+        default=10,
+        help="Number of random seeds to evaluate",
+    )
+    parser.add_argument(
+        "--expert-path",
+        default=DEFAULT_EXPERT_PATH,
+        help="Path to the expert model",
+    )
+    parser.add_argument(
+        "--learner-path",
+        default=DEFAULT_LEARNER_PATH,
+        help="Path to the learner model",
+    )
+    args = parser.parse_args()
 
-        print(ca)
-        print(cr)
-        for ii in range(len(ca)):
-            print(ca[ii],cr[ii],ns[ii])
+    seeds = generate_seeds(args.num_seeds)
+    env = make_env(args.env)
+    expert = PPO.load(args.expert_path)
+    learner = PPO.load(args.learner_path)
 
-        print(max_a, min_a, max_r, min_r)
+    if args.agent == "e":
+        scores, penalties, _, _, _ = evaluate(expert, env, seeds)
+        print(f"Expert mean score: {np.mean(scores):.2f}")
+        print(f"Expert median score: {np.median(scores):.2f}")
+        print(f"Mean safe distance penalty: {np.mean(penalties):.2f}")
+    elif args.agent == "l":
+        scores, penalties, _, _, _ = evaluate(learner, env, seeds)
+        print(f"Learner mean score: {np.mean(scores):.2f}")
+        print(f"Learner median score: {np.median(scores):.2f}")
+        print(f"Mean safe distance penalty: {np.mean(penalties):.2f}")
+    else:
+        exp_scores, exp_penalties, exp_actions, exp_rewards, _ = evaluate(expert, env, seeds)
+        ler_scores, ler_penalties, ler_actions, ler_rewards, _ = evaluate(learner, env, seeds)
+        action_corr, reward_corr, valid_seeds = compute_correlations(
+            (exp_actions, exp_rewards), (ler_actions, ler_rewards), seeds
+        )
+        print(f"Expert mean score: {np.mean(exp_scores):.2f}")
+        print(f"Learner mean score: {np.mean(ler_scores):.2f}")
+        print(f"Expert mean penalty: {np.mean(exp_penalties):.2f}")
+        print(f"Learner mean penalty: {np.mean(ler_penalties):.2f}")
+        if action_corr:
+            print(f"Action correlation median: {np.median(action_corr):.2f}")
+            print(f"Reward correlation median: {np.median(reward_corr):.2f}")
+    print(f"seeds: {seeds}")
 
-        idx_xa = ca.index(max_a)
-        idx_xr = cr.index(max_r)
 
-        max_a_seed = s[idx_xa]
-        max_r_seed = s[idx_xr]
+if __name__ == "__main__":
+    main()
 
-        print(f"max action cor: {max_a:.2f}, reward: {cr[idx_xa]}, seed: {max_a_seed}, min action cor: {min_a:.2f}")
-        print(f"max reward cor: {max_r:.2f}, action: {ca[idx_xr]}, seed: {max_r_seed}, min reward cor: {min_r:.2f}")
-
-        print(f"Action's correlation between the expert and the learner: {np.median(ca):.2f}")
-        print(f"Reward's correlation between the expert and the learner: {np.median(cr):.2f}")
-
-print(f"seeds: {s}")

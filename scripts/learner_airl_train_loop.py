@@ -10,6 +10,7 @@ from stable_baselines3.common.evaluation import evaluate_policy
 from av_irl import ZeroRewardWrapper
 import os
 import logging
+from typing import Optional
 from highway_env.envs.merge_env import MergeEnv
 import argparse
 
@@ -19,7 +20,40 @@ def _silent_is_terminated(self) -> bool:
 MergeEnv._is_terminated = _silent_is_terminated
 
 
-def train_airl(env_name, rollout_filename, learner: PPO, rng, ts, log_path: str):
+class EarlyStopping:
+    """Simple early stopping for adversarial training."""
+
+    def __init__(self, patience: int, eval_env):
+        self.patience = patience
+        self.eval_env = eval_env
+        self.best_reward = -float("inf")
+        self.wait = 0
+        self.stop_step: Optional[int] = None
+
+    def __call__(self, round_num: int, trainer: AIRL) -> None:
+        step = (round_num + 1) * trainer.gen_train_timesteps
+        mean_reward, _ = evaluate_policy(trainer.gen_algo, self.eval_env, 5)
+        if mean_reward > self.best_reward:
+            self.best_reward = mean_reward
+            self.wait = 0
+        else:
+            self.wait += 1
+            if self.wait > self.patience:
+                self.stop_step = step
+                print(f"Early stopping at {step} steps")
+                raise StopIteration
+
+
+
+def train_airl(
+    env_name: str,
+    rollout_filename: str,
+    learner: PPO,
+    rng,
+    ts: int,
+    log_path: str,
+    patience: int,
+) -> Optional[int]:
 
     venv = make_vec_env(
         env_name,
@@ -64,75 +98,91 @@ def train_airl(env_name, rollout_filename, learner: PPO, rng, ts, log_path: str)
 
     learner_reward_before_training, _ = evaluate_policy(learner, venv, 30)
     logging.info(f"Reward before training: {learner_reward_before_training}")
-    airl_trainer.train(int(ts))
+
+    eval_env = make_vec_env(
+        env_name,
+        n_envs=1,
+        parallel=True,
+        rng=rng,
+        env_make_kwargs={"config": {"ego_spacing": 3.0}},
+        post_wrappers=[lambda e, _: ZeroRewardWrapper(e)],
+    )
+    eval_env = RewardVecEnvWrapper(eval_env, reward_net.predict_processed)
+
+    stopper = EarlyStopping(patience, eval_env)
+    try:
+        airl_trainer.train(int(ts), callback=lambda r: stopper(r, airl_trainer))
+    except StopIteration:
+        pass
+
     learner_reward_after_training, _ = evaluate_policy(learner, venv, 30)
     logging.info(f"Reward after training: {learner_reward_after_training}")
 
+    return stopper.stop_step
+
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
-    
+
     parser = argparse.ArgumentParser(description="train an airl learner")
-    parser.add_argument("--ts", default= 1e5, help="timesteps")
-    args = parser.parse_args()   
-    
+    parser.add_argument("--env", default="highway-fast-v0", help="environment name")
+    parser.add_argument("--rollout", required=True, help="rollout pickle file")
+    parser.add_argument("--out", default="model/airl_learner.zip", help="path to save the learner")
+    parser.add_argument("--ts", type=int, default=100000, help="training timesteps")
+    parser.add_argument(
+        "--patience",
+        type=int,
+        default=5,
+        help="evaluations to wait for improvement before stopping",
+    )
+    args = parser.parse_args()
+
     rng = np.random.default_rng()
-    # log_path = '/lyceum/tg4u22/project/output/'
     log_path = os.path.join(os.getcwd(), 'output')
-    suffixes = ['1k', '2k', '4k', '8k', '16k', '32k', '64k', '128k']
-    n_cpu = 6
-    batch_size = 512
-    ts = int(args.ts)
 
-    for suffix in suffixes:
-        logging.info(f"Training for suffix: {suffix}")
+    venv = make_vec_env(
+        args.env,
+        n_envs=8,
+        parallel=True,
+        rng=rng,
+        env_make_kwargs={"config": {"ego_spacing": 3.0}},
+        post_wrappers=[lambda e, _: ZeroRewardWrapper(e)],
+    )
 
-        env_name_h = "highway-fast-v0"
-
-        venv = make_vec_env(
-            env_name_h,
-            n_envs=8,
-            parallel=True,
-            rng=rng,
-            env_make_kwargs={"config": {"ego_spacing": 3.0}},
-            post_wrappers=[lambda e, _: ZeroRewardWrapper(e)],
+    batch_size = 1024
+    n_steps = 8192
+    policy_kwargs = dict(
+        net_arch=dict(
+            pi=[1024, 1024, 512],
+            vf=[1024, 1024, 512]
         )
+    )
 
+    learner = PPO(
+        'MlpPolicy',
+        env=venv,
+        policy_kwargs=policy_kwargs,
+        n_steps=n_steps,
+        batch_size=batch_size,
+        n_epochs=10,
+        learning_rate=5e-4,
+        gamma=0.95,
+        verbose=2,
+        tensorboard_log=log_path,
+        ent_coef=0.01,
+        device='cuda')
 
-        learner = PPO(
-            'MlpPolicy',
-            env=venv,
-            policy_kwargs=dict(net_arch=[dict(pi=[256, 256], vf=[256, 256])]),
-            n_steps=batch_size*12 // n_cpu,
-            batch_size=batch_size,
-            n_epochs=10,
-            learning_rate=5e-4,
-            gamma=0.8,
-            verbose=2,
-            tensorboard_log=log_path,
-            device='cuda'
-        )
+    stop_step = train_airl(
+        env_name=args.env,
+        rollout_filename=args.rollout,
+        learner=learner,
+        rng=rng,
+        ts=args.ts,
+        log_path=log_path,
+        patience=args.patience,
+    )
 
-        train_airl(
-            env_name="highway-fast-v0",
-            # rollout_filename=f"/lyceum/tg4u22/project/rollouts_1_hf_{suffix}.pkl",
-            rollout_filename='./rollout/rollout_ts100_h2.pkl',
-            learner=learner,
-            rng=rng,
-            ts=ts,
-            log_path=log_path,
-        )
+    if stop_step is not None:
+        logging.info("Training stopped early at %d steps", stop_step)
 
-        train_airl(
-            env_name="merge-v0",
-            # rollout_filename=f"/lyceum/tg4u22/project/rollouts_2_m2_{suffix}.pkl",
-            rollout_filename='./rollout/rollout_ts100_h2.pkl',
-            learner=learner,
-            rng=rng,
-            ts=ts,
-            log_path=log_path,
-        )
+    learner.save(args.out)
 
-        model_name_suffix=f"e{suffix}_ts{ts}_ts{ts}_mlt_old"
-        # learner.save(f'/lyceum/tg4u22/project/model/airl_learner_august_{model_name_suffix}')
-         
-        learner.save('model/airl_learner')

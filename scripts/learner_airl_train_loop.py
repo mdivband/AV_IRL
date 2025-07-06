@@ -1,3 +1,6 @@
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="pygame.pkgdata")
+
 import numpy as np
 import pickle
 from imitation.algorithms.adversarial.airl import AIRL
@@ -60,7 +63,7 @@ def train_airl(
         n_envs=8,
         parallel=True,
         rng=rng,
-        env_make_kwargs={"config": {"ego_spacing": 3.0}},
+        env_make_kwargs={'config': {'ego_spacing': 3.0, 'simulation_frequency': 7, 'policy_frequency': 2, 'duration': 15}},
         post_wrappers=[lambda e, _: ZeroRewardWrapper(e)],
     )
 
@@ -101,10 +104,10 @@ def train_airl(
 
     eval_env = make_vec_env(
         env_name,
-        n_envs=1,
+        n_envs=4,
         parallel=True,
         rng=rng,
-        env_make_kwargs={"config": {"ego_spacing": 3.0}},
+        env_make_kwargs={'config': {'ego_spacing': 3.0, 'simulation_frequency': 7, 'policy_frequency': 2, 'duration': 15}},
         post_wrappers=[lambda e, _: ZeroRewardWrapper(e)],
     )
     eval_env = RewardVecEnvWrapper(eval_env, reward_net.predict_processed)
@@ -144,18 +147,13 @@ if __name__ == '__main__':
         n_envs=8,
         parallel=True,
         rng=rng,
-        env_make_kwargs={"config": {"ego_spacing": 3.0}},
+        env_make_kwargs={'config': {'ego_spacing': 3.0, 'simulation_frequency': 7, 'policy_frequency': 2, 'duration': 15}},
         post_wrappers=[lambda e, _: ZeroRewardWrapper(e)],
     )
 
     batch_size = 1024
     n_steps = 8192
-    policy_kwargs = dict(
-        net_arch=dict(
-            pi=[1024, 1024, 512],
-            vf=[1024, 1024, 512]
-        )
-    )
+    policy_kwargs = dict(net_arch=dict(pi=[512, 256], vf=[512, 256]))
 
     learner = PPO(
         'MlpPolicy',
@@ -165,7 +163,7 @@ if __name__ == '__main__':
         batch_size=batch_size,
         n_epochs=10,
         learning_rate=5e-4,
-        gamma=0.95,
+        gamma=0.9,
         verbose=2,
         tensorboard_log=log_path,
         ent_coef=0.01,

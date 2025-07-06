@@ -7,7 +7,8 @@ pyyaml==6.0
 
 stable-baselines3==2.2.1
 imitation==1.0.1
-gymnasium
-numpy
+gymnasium==1.9.1
+numpy==1.24.4
 pytest
 highway-env==1.8.2
+

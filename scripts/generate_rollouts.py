@@ -1,3 +1,6 @@
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="pygame.pkgdata")
+
 import argparse
 import logging
 import pickle
@@ -31,7 +34,7 @@ def generate_rollouts(model_path: str, env_name: str, output: str, episodes: int
         env_name,
         n_envs=1,
         rng=rng,
-        env_make_kwargs={"config": {"ego_spacing": 3.0}},
+        env_make_kwargs={'config': {'ego_spacing': 3.0, 'simulation_frequency': 7, 'policy_frequency': 2, 'duration': 15}},
         post_wrappers=[wrap_env, lambda e, _: RolloutInfoWrapper(e)],
     )
     model = PPO.load(model_path, env=venv)

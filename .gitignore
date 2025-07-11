@@ -8,3 +8,4 @@ rollout/
 *.egg-info/
 tmp/
 nohup.out
+tmp*

@@ -74,7 +74,7 @@ def train_airl(
     )
     venv = RewardVecEnvWrapper(venv, reward_net.predict_processed)
     logging.info(f"open rollouts file: {rollout_filename}")
-    
+
     with open(rollout_filename, "rb") as f:
         loaded_rollouts = pickle.load(f)
 
@@ -128,9 +128,13 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description="train an airl learner")
     parser.add_argument("--env", default="highway-fast-v0", help="environment name")
-    parser.add_argument("--rollout", required=True, help="rollout pickle file")
+    # parser.add_argument("--rollout", required=True, help="rollout pickle file")
     parser.add_argument("--out", default="model/airl_learner.zip", help="path to save the learner")
     parser.add_argument("--ts", type=int, default=100000, help="training timesteps")
+    parser.add_argument("--a", type=float, default=1, help="speed")
+    parser.add_argument("--b", type=float, default=1, help="distance")
+    parser.add_argument("--size", type=int, default=8000, help="rollout size")
+
     parser.add_argument(
         "--patience",
         type=int,
@@ -138,6 +142,9 @@ if __name__ == '__main__':
         help="evaluations to wait for improvement before stopping",
     )
     args = parser.parse_args()
+    a = args.a
+    b = args.b
+    size = args.size
 
     rng = np.random.default_rng()
     log_path = os.path.join(os.getcwd(), 'output')
@@ -169,9 +176,12 @@ if __name__ == '__main__':
         ent_coef=0.01,
         device='cuda')
 
-    stop_step = train_airl(
-        env_name=args.env,
-        rollout_filename=args.rollout,
+    logging.info('train in highway-fast-v0')
+    print('train in highway-fast-v0')
+    train_airl(
+        env_name="highway-fast-v0",
+        # rollout_filename=args.rollout,
+        rollout_filename=f"rollout/hf_a{a}_b{b}_{size}.pkl",
         learner=learner,
         rng=rng,
         ts=args.ts,
@@ -179,8 +189,17 @@ if __name__ == '__main__':
         patience=args.patience,
     )
 
-    if stop_step is not None:
-        logging.info("Training stopped early at %d steps", stop_step)
+    logging.info('train in merge-v0')
+    print('train in merge-v0')
+    train_airl(
+        env_name="merge-v0",
+        # rollout_filename=args.rollout,
+        rollout_filename=f"rollout/mg_a{a}_b{b}_{size}.pkl",
+        learner=learner,
+        rng=rng,
+        ts=args.ts,
+        log_path=log_path,
+        patience=args.patience,
+    )
 
     learner.save(args.out)
-

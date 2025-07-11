@@ -7,8 +7,8 @@ import numpy as np
 from stable_baselines3 import PPO
 
 # Default model locations. Override on the command line if needed.
-DEFAULT_EXPERT_PATH = "model/expert_ppo_mlt_h1_m_h2"
-DEFAULT_LEARNER_PATH = "model/expert_ppo_mlt_h1_m_h2"
+DEFAULT_EXPERT_PATH = "model/manual_test/expert_ppo_mlt_h1_m_h2"
+DEFAULT_LEARNER_PATH = "model/manual_test/expert_ppo_mlt_h1_m_h2"
 
 
 def make_env(env_code: str) -> gym.Env:

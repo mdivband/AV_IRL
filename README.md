@@ -64,9 +64,7 @@ This trains experts for three `(a, b)` settings, generates rollouts in two envir
 
 ### Coefficients `a` and `b`
 
-`a` controls how strongly the base environment reward is scaled. A value
-greater than one amplifies the original reward signal, while a value between
-zero and one dampens it.  `b` determines the weight of the safe-distance
+`a` controls the weight of the spped.  `b` determines the weight of the safe-distance
 penalty applied by `SafeDistanceRewardWrapper`.
 
 ### Why compare them for AIRL?

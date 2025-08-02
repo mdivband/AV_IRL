@@ -1,13 +1,9 @@
-torch==1.13.1+cu117
-torchvision==0.14.1+cu117
-torchaudio==0.13.1
-
 huggingface-sb3==3.0
 pyyaml==6.0
 
 stable-baselines3==2.2.1
 imitation==1.0.1
-gymnasium==1.9.1
+gymnasium==0.29.1
 numpy==1.24.4
 pytest
 highway-env==1.8.2

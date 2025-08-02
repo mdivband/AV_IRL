@@ -59,7 +59,7 @@ if __name__ == '__main__':
     parser.add_argument(
         "--patience",
         type=int,
-        default=3,
+        default=5,
         help="Evaluations to wait for improvement before early stopping",
     )
     args = parser.parse_args()

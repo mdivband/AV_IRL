@@ -12,7 +12,7 @@ mkdir -p model rollout logs
 AS=(0.2 0.5 0.8)
 BS=(0.8 0.5 0.2)
 
-ROLLOUT_SIZES=(8000 32000 64000)
+ROLLOUT_SIZES=(100 500 2000 8000 32000 64000)
 LEARNER_TS=(100000 200000)
 ENVS=("highway-fast-v0" "merge-v0")
 ENVS_L=("highway-fast-v0")

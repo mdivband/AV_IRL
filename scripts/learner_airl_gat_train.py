@@ -9,7 +9,7 @@ from imitation.data.rollout import make_min_episodes
 from imitation.rewards.reward_wrapper import RewardVecEnvWrapper
 from imitation.util.util import make_vec_env
 from av_irl import ZeroRewardWrapper
-from gat import GATRewardNet
+from av_irl.gat import GATRewardNet
 from highway_env.envs.merge_env import MergeEnv
 
 # Silence highway termination warning

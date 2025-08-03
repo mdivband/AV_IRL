@@ -4,6 +4,7 @@ from .safe_distance import (
 from .driving_style import DrivingStyleRewardWrapper
 from .zero_reward import ZeroRewardWrapper
 from .slot_attention import SlotRewardNet
+from .gat import GATRewardNet
 
 __all__ = [
     "calculate_safe_distance",
@@ -11,4 +12,5 @@ __all__ = [
     "ZeroRewardWrapper",
     "SlotAttention",
     "SlotRewardNet",
+    "GATRewardNet",
 ]

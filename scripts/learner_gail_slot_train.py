@@ -1,22 +1,23 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="pygame.pkgdata")
 
-import os, logging, argparse, pickle, pathlib
+import os, logging, argparse, pickle
 from typing import Optional
 import numpy as np
 import torch
-
+import torch.nn as nn
 from stable_baselines3 import PPO
-from imitation.algorithms.adversarial.airl import AIRL
-from imitation.data.rollout import make_min_episodes, rollout
-from imitation.rewards.reward_nets import BasicShapedRewardNet
+from stable_baselines3.common.evaluation import evaluate_policy
+
+from imitation.algorithms.adversarial.gail import GAIL
 from imitation.rewards.reward_wrapper import RewardVecEnvWrapper
 from imitation.util.networks import RunningNorm
 from imitation.util.util import make_vec_env
-
 from highway_env.envs.merge_env import MergeEnv
 from av_irl import ZeroRewardWrapper
+from av_irl.slot_attention import SlotRewardNet
 
 def _silent_is_terminated(self) -> bool:
     return self.vehicle.crashed or bool(self.vehicle.position[0] > 370)
@@ -33,15 +34,13 @@ KINEMATICS_REL_CFG = {
     }
 }
 
+
 class EarlyStopping:
     def __init__(self, patience: int, eval_env):
-        self.patience = patience
-        self.eval_env = eval_env
-        self.best_reward = -float("inf")
-        self.wait = 0
-        self.stop_step: Optional[int] = None
+        self.patience, self.eval_env = patience, eval_env
+        self.best_reward, self.wait, self.stop_step = -float("inf"), 0, None
 
-    def __call__(self, round_num: int, trainer: AIRL) -> None:
+    def __call__(self, round_num: int, trainer: GAIL) -> None:
         step = (round_num + 1) * trainer.gen_train_timesteps
         mean_r, _ = evaluate_policy(trainer.gen_algo, self.eval_env, 5)
         if mean_r > self.best_reward:
@@ -53,7 +52,7 @@ class EarlyStopping:
                 print(f"[EarlyStop] Stopping at {step} steps")
                 raise StopIteration
 
-def train_airl(
+def train_gail(
     env_name: str,
     rollout_filename: str,
     learner: PPO,
@@ -61,7 +60,7 @@ def train_airl(
     ts: int,
     log_path: str,
     patience: int,
-) -> BasicShapedRewardNet:
+) -> SlotRewardNet:
 
     venv = make_vec_env(
         env_name,
@@ -73,26 +72,31 @@ def train_airl(
     )
     learner.set_env(venv)
 
-    reward_net = BasicShapedRewardNet(
-        venv.observation_space,
-        venv.action_space,
-        normalize_input_layer=RunningNorm,
-    )
-    venv = RewardVecEnvWrapper(venv, reward_net.predict_processed)
+    reward_net = SlotRewardNet(
+        obs_space=venv.observation_space,
+        act_space=venv.action_space,
+        num_slots=4,
+        slot_dim=32,
+        hidden=64,
+    ).to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
 
+    venv = RewardVecEnvWrapper(venv, reward_net.forward)
+
+    logging.info("Loading rollouts from %s", rollout_filename)
     with open(rollout_filename, "rb") as f:
         demos = pickle.load(f)
+
     demo_batch = min(1024, sum(len(t) for t in demos))
 
-    airl_trainer = AIRL(
+    gail_trainer = GAIL(
         demonstrations=demos,
         demo_batch_size=demo_batch,
+        gen_replay_buffer_capacity=2048,
+        n_disc_updates_per_round=2,
         venv=venv,
         gen_algo=learner,
         reward_net=reward_net,
         log_dir=log_path,
-        n_disc_updates_per_round=2,
-        gen_replay_buffer_capacity=2048,
         allow_variable_horizon=True,
     )
 
@@ -104,23 +108,24 @@ def train_airl(
         env_make_kwargs={"config": KINEMATICS_REL_CFG},
         post_wrappers=[lambda e, _: ZeroRewardWrapper(e)],
     )
-    eval_env = RewardVecEnvWrapper(eval_env, reward_net.predict_processed)
+    eval_env = RewardVecEnvWrapper(eval_env, reward_net.forward)
+
     stopper = EarlyStopping(patience, eval_env)
 
     try:
-        airl_trainer.train(int(ts), callback=lambda r: stopper(r, airl_trainer))
+        gail_trainer.train(int(ts), callback=lambda r: stopper(r, gail_trainer))
     except StopIteration:
         pass
 
-    return reward_net
+    return stopper.stop_step
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Train a Slot-GAIL learner")
     parser.add_argument("--env", default="highway-fast-v0")
-    parser.add_argument("--out", default="model/airl_learner.zip")
-    parser.add_argument("--ts", type=int, default=100_000)
+    parser.add_argument("--out", default="model/slot_gail_learner.zip")
+    parser.add_argument("--ts", type=int, default=100000)
     parser.add_argument("--a", type=float, default=1)
     parser.add_argument("--b", type=float, default=1)
     parser.add_argument("--size", type=int, default=8000)
@@ -138,6 +143,7 @@ if __name__ == "__main__":
         env_make_kwargs={"config": KINEMATICS_REL_CFG},
         post_wrappers=[lambda e, _: ZeroRewardWrapper(e)],
     )
+
     learner = PPO(
         "MlpPolicy",
         env=venv_init,
@@ -154,7 +160,7 @@ if __name__ == "__main__":
     )
 
     logging.info("Training on highway-fast-v0")
-    reward_net1 = train_airl(
+    train_gail(
         env_name="highway-fast-v0",
         rollout_filename=f"rollout/hf_a{args.a}_b{args.b}_{args.size}.pkl",
         learner=learner,
@@ -165,7 +171,7 @@ if __name__ == "__main__":
     )
 
     logging.info("Training on merge-v0")
-    reward_net2 = train_airl(
+    train_gail(
         env_name="merge-v0",
         rollout_filename=f"rollout/mg_a{args.a}_b{args.b}_{args.size}.pkl",
         learner=learner,
@@ -176,7 +182,4 @@ if __name__ == "__main__":
     )
 
     learner.save(args.out)
-    reward_path = f"model/reward_net_a{args.a}_b{args.b}_{args.size}_ts{args.ts}_reward.pt"
-    torch.save(reward_net2, reward_path)
-    print("Saved policy   ->", args.out)
-    print("Saved reward   ->", reward_path)
+    print("Saved Slot-GAIL learner ->", args.out)

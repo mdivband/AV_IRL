@@ -2,29 +2,44 @@
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="pygame.pkgdata")
 
-import numpy as np
-import pickle, torch, os, logging, argparse, pathlib
+import os, logging, argparse, pickle, pathlib
 from typing import Optional
+import numpy as np
+import torch
+
+from stable_baselines3 import PPO
 from imitation.algorithms.adversarial.airl import AIRL
+from imitation.data.rollout import make_min_episodes, rollout
 from imitation.rewards.reward_nets import BasicShapedRewardNet
+from imitation.rewards.reward_wrapper import RewardVecEnvWrapper
 from imitation.util.networks import RunningNorm
 from imitation.util.util import make_vec_env
-from imitation.rewards.reward_wrapper import RewardVecEnvWrapper
-from stable_baselines3 import PPO
-from stable_baselines3.common.evaluation import evaluate_policy
-from av_irl import ZeroRewardWrapper
-from highway_env.envs.merge_env import MergeEnv
 
+from highway_env.envs.merge_env import MergeEnv
+from av_irl import ZeroRewardWrapper
 
 def _silent_is_terminated(self) -> bool:
     return self.vehicle.crashed or bool(self.vehicle.position[0] > 370)
 MergeEnv._is_terminated = _silent_is_terminated
 
+KINEMATICS_REL_CFG = {
+    "ego_spacing": 3.0,
+    "observation": {
+        "type": "Kinematics",
+        "features": ["presence", "x", "y", "vx", "vy"],
+        "absolute": False,
+        "normalize": True,
+        "vehicles_count": 5
+    }
+}
 
 class EarlyStopping:
     def __init__(self, patience: int, eval_env):
-        self.patience, self.eval_env = patience, eval_env
-        self.best_reward, self.wait, self.stop_step = -float("inf"), 0, None
+        self.patience = patience
+        self.eval_env = eval_env
+        self.best_reward = -float("inf")
+        self.wait = 0
+        self.stop_step: Optional[int] = None
 
     def __call__(self, round_num: int, trainer: AIRL) -> None:
         step = (round_num + 1) * trainer.gen_train_timesteps
@@ -35,9 +50,8 @@ class EarlyStopping:
             self.wait += 1
             if self.wait > self.patience:
                 self.stop_step = step
-                print(f"Early stopping at {step} steps")
+                print(f"[EarlyStop] Stopping at {step} steps")
                 raise StopIteration
-
 
 def train_airl(
     env_name: str,
@@ -51,23 +65,18 @@ def train_airl(
 
     venv = make_vec_env(
         env_name,
-        n_envs=8,
+        n_envs=12,
         parallel=True,
         rng=rng,
-        env_make_kwargs={
-            "config": {
-                "ego_spacing": 3.0,
-                "simulation_frequency": 7,
-                "policy_frequency": 2,
-                "duration": 15,
-            }
-        },
+        env_make_kwargs={"config": KINEMATICS_REL_CFG},
         post_wrappers=[lambda e, _: ZeroRewardWrapper(e)],
     )
     learner.set_env(venv)
 
     reward_net = BasicShapedRewardNet(
-        venv.observation_space, venv.action_space, normalize_input_layer=RunningNorm
+        venv.observation_space,
+        venv.action_space,
+        normalize_input_layer=RunningNorm,
     )
     venv = RewardVecEnvWrapper(venv, reward_net.predict_processed)
 
@@ -89,17 +98,10 @@ def train_airl(
 
     eval_env = make_vec_env(
         env_name,
-        n_envs=4,
+        n_envs=8,
         parallel=True,
         rng=rng,
-        env_make_kwargs={
-            "config": {
-                "ego_spacing": 3.0,
-                "simulation_frequency": 7,
-                "policy_frequency": 2,
-                "duration": 15,
-            }
-        },
+        env_make_kwargs={"config": KINEMATICS_REL_CFG},
         post_wrappers=[lambda e, _: ZeroRewardWrapper(e)],
     )
     eval_env = RewardVecEnvWrapper(eval_env, reward_net.predict_processed)
@@ -112,14 +114,13 @@ def train_airl(
 
     return reward_net
 
-
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--env", default="highway-fast-v0")
     parser.add_argument("--out", default="model/airl_learner.zip")
-    parser.add_argument("--ts", type=int, default=100000)
+    parser.add_argument("--ts", type=int, default=100_000)
     parser.add_argument("--a", type=float, default=1)
     parser.add_argument("--b", type=float, default=1)
     parser.add_argument("--size", type=int, default=8000)
@@ -131,17 +132,10 @@ if __name__ == "__main__":
 
     venv_init = make_vec_env(
         args.env,
-        n_envs=8,
+        n_envs=12,
         parallel=True,
         rng=rng,
-        env_make_kwargs={
-            "config": {
-                "ego_spacing": 3.0,
-                "simulation_frequency": 7,
-                "policy_frequency": 2,
-                "duration": 15,
-            }
-        },
+        env_make_kwargs={"config": KINEMATICS_REL_CFG},
         post_wrappers=[lambda e, _: ZeroRewardWrapper(e)],
     )
     learner = PPO(
@@ -180,9 +174,7 @@ if __name__ == "__main__":
     )
 
     learner.save(args.out)
-    #reward_path = pathlib.Path(args.out).with_suffix("").with_suffix("_reward.pt")
-    reward_path = f"airl_a{args.a}_b{args.b}_reward.pt"
+    reward_path = f"model/reward_net_a{args.a}_b{args.b}_{args.size}_ts{args.ts}_reward.pt"
     torch.save(reward_net2, reward_path)
-    print("Saved policy ->", args.out)
-    print("Saved reward_net ->", reward_path)
-
+    print("Saved policy   ->", args.out)
+    print("Saved reward   ->", reward_path)

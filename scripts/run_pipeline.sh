@@ -74,13 +74,13 @@ for i in "${!AS[@]}"; do
     for size in "${ROLLOUT_SIZES[@]}"; do
       roll_pkl="rollout/${short}_a${a}_b${b}_${size}.pkl"
 
-      # Skip if the required rollout is missing
+      # Skip if rollout missing
       if [[ ! -f "$roll_pkl" ]]; then
         log "Required rollout $roll_pkl not found – skipping learners for this setup."
         continue
       fi
 
-      for alg in airl gail; do
+      for alg in airl gail airl_slot; do
         for ts in "${LEARNER_TS[@]}"; do
           learner_zip="model/${alg}_a${a}_b${b}_${size}_ts${ts}.zip"
 
@@ -90,20 +90,32 @@ for i in "${!AS[@]}"; do
           fi
 
           log "Training $alg  env=$env  rollouts=$size  ts=$ts"
-          if [[ "$alg" == "airl" ]]; then
-            python scripts/learner_airl_train_loop.py \
-              --env "$env" --a "$a" --b "$b" --size "$size" --out "$learner_zip" --ts "$ts" \
-              > "logs/${alg}_a${a}_b${b}__${size}_ts${ts}.log" 2>&1
-          else
-            python scripts/learner_gail_train_loop.py \
-              --env "$env" --a "$a" --b "$b" --size "$size" --out "$learner_zip" --ts "$ts" \
-              > "logs/${alg}_a${a}_b${b}_${size}_ts${ts}.log" 2>&1
-          fi
+          case "$alg" in
+            airl)
+              python scripts/learner_airl_train_loop.py \
+                --env "$env" --a "$a" --b "$b" --size "$size" \
+                --out "$learner_zip" --ts "$ts" \
+                > "logs/${alg}_a${a}_b${b}_${size}_ts${ts}.log" 2>&1
+              ;;
+            gail)
+              python scripts/learner_gail_train_loop.py \
+                --env "$env" --a "$a" --b "$b" --size "$size" \
+                --out "$learner_zip" --ts "$ts" \
+                > "logs/${alg}_a${a}_b${b}_${size}_ts${ts}.log" 2>&1
+              ;;
+            airl_slot)
+              python scripts/learner_airl_slot_train.py \
+                --env "$env" --a "$a" --b "$b" --size "$size" \
+                --out "$learner_zip" --ts "$ts" \
+                > "logs/${alg}_a${a}_b${b}_${size}_ts${ts}.log" 2>&1
+              ;;
+          esac
         done
       done
     done
   done
 done
+
 
 log "Pipeline complete"
 

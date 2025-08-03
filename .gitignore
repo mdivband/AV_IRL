@@ -9,3 +9,4 @@ rollout/
 tmp/
 nohup.out
 tmp*
+*_old.py

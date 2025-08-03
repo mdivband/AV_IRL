@@ -80,7 +80,7 @@ for i in "${!AS[@]}"; do
         continue
       fi
 
-      for alg in airl gail airl_slot gail_slot; do
+      for alg in airl gail airl_slot gail_slot airl_gat gail_gat; do
         for ts in "${LEARNER_TS[@]}"; do
           learner_zip="model/${alg}_a${a}_b${b}_${size}_ts${ts}.zip"
 
@@ -111,6 +111,18 @@ for i in "${!AS[@]}"; do
               ;;
             gail_slot)
               python scripts/learner_gail_slot_train.py \
+                --env "$env" --a "$a" --b "$b" --size "$size" \
+                --out "$learner_zip" --ts "$ts" \
+                > "logs/${alg}_a${a}_b${b}_${size}_ts${ts}.log" 2>&1
+              ;;
+            airl_gat)
+              python scripts/learner_airl_gat_train.py \
+                --env "$env" --a "$a" --b "$b" --size "$size" \
+                --out "$learner_zip" --ts "$ts" \
+                > "logs/${alg}_a${a}_b${b}_${size}_ts${ts}.log" 2>&1
+              ;;
+            gail_gat)
+              python scripts/learner_gail_gat_train.py \
                 --env "$env" --a "$a" --b "$b" --size "$size" \
                 --out "$learner_zip" --ts "$ts" \
                 > "logs/${alg}_a${a}_b${b}_${size}_ts${ts}.log" 2>&1

@@ -12,7 +12,7 @@ mkdir -p model rollout logs
 AS=(0.2 0.5 0.8)
 BS=(0.8 0.5 0.2)
 
-ROLLOUT_SIZES=(100 500 2000 8000 32000 64000)
+ROLLOUT_SIZES=(100 500 2000 8000 32000)
 LEARNER_TS=(100000 200000)
 ENVS=("highway-fast-v0" "merge-v0")
 ENVS_L=("highway-fast-v0")
@@ -80,7 +80,7 @@ for i in "${!AS[@]}"; do
         continue
       fi
 
-      for alg in airl gail airl_slot; do
+      for alg in airl gail airl_slot gail_slot; do
         for ts in "${LEARNER_TS[@]}"; do
           learner_zip="model/${alg}_a${a}_b${b}_${size}_ts${ts}.zip"
 
@@ -105,6 +105,12 @@ for i in "${!AS[@]}"; do
               ;;
             airl_slot)
               python scripts/learner_airl_slot_train.py \
+                --env "$env" --a "$a" --b "$b" --size "$size" \
+                --out "$learner_zip" --ts "$ts" \
+                > "logs/${alg}_a${a}_b${b}_${size}_ts${ts}.log" 2>&1
+              ;;
+            gail_slot)
+              python scripts/learner_gail_slot_train.py \
                 --env "$env" --a "$a" --b "$b" --size "$size" \
                 --out "$learner_zip" --ts "$ts" \
                 > "logs/${alg}_a${a}_b${b}_${size}_ts${ts}.log" 2>&1

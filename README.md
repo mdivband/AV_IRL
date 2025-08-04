@@ -1,6 +1,6 @@
-# AV_IRL
+# Predicting Autonomous Vehicles Behaviour in Unknown Environments Using IRL and Attention
 
-This project contains utilities for training and evaluating autonomous vehicle agents using inverse reinforcement learning (IRL). It demonstrates adversarial IRL techniques based on **Generative Adversarial Imitation Learning (GAIL)** and **Adversarial Inverse Reinforcement Learning (AIRL)**. Training scripts rely on [Stable-Baselines3](https://github.com/DLR-RM/stable-baselines3), [imitation](https://github.com/HumanCompatibleAI/imitation), and `gymnasium` environments representing highway-style driving tasks.
+This project contains utilities for training and evaluating autonomous vehicle agents using inverse reinforcement learning (IRL) and attention. It demonstrates adversarial IRL techniques based on **Generative Adversarial Imitation Learning (GAIL)** and **Adversarial Inverse Reinforcement Learning (AIRL)**. Training scripts rely on [Stable-Baselines3](https://github.com/DLR-RM/stable-baselines3), [imitation](https://github.com/HumanCompatibleAI/imitation), and `gymnasium` environments representing highway-style driving tasks.
 
 We further explore **structure-aware reward networks** by integrating **Slot Attention** and **Graph Attention Networks (GAT)** as neural encoders in both AIRL and GAIL. These help improve generalisation and interpretability in high-dimensional, object-centric driving scenarios.
 

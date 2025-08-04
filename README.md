@@ -4,7 +4,7 @@ This project contains utilities for training and evaluating autonomous vehicle a
 
 We further explore **structure-aware reward networks** by integrating **Slot Attention** and **Graph Attention Networks (GAT)** as neural encoders in both AIRL and GAIL. These help improve generalisation and interpretability in high-dimensional, object-centric driving scenarios.
 
-All environments are wrapped with a **SafeDistanceRewardWrapper** which subtracts a continuous penalty for driving too close to nearby vehicles. Distances to the lead car and lateral neighbours are inferred directly from the environment using the `neighbour_vehicles` and `close_vehicles_to` helpers from `highway-env`. A **TimePenaltyWrapper** applies a small negative reward each step so agents learn to reach their goal quickly. These wrappers encourage safer behaviour and faster completion compared to the previous boolean collision reward.
+All environments are wrapped with a **SafeDistanceRewardWrapper** which subtracts a continuous penalty for driving too close to nearby vehicles.
 
 ## Project Layout
 
@@ -35,15 +35,6 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-Alternatively, a standard virtual environment works as well:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-pip install -e .
-```
-
 Installing in editable mode ensures the `av_irl` package is importable when running scripts.
 
 ## Usage
@@ -51,7 +42,7 @@ Installing in editable mode ensures the `av_irl` package is importable when runn
 Run one of the training loops using the provided CLI options:
 
 ```bash
-python scripts/airl_expert_ppo_training.py --timesteps 100000
+python scripts/expert_ppo_training.py --timesteps 100000
 ```
 
 Run AIRL or GAIL with custom reward encoders:
@@ -61,13 +52,7 @@ python scripts/learner_airl_slot_train.py    # AIRL + Slot Attention
 python scripts/learner_gail_gat_train.py     # GAIL + GAT
 ```
 
-Evaluate the agent using:
-
-```bash
-python scripts/final_eval.py e h --num-seeds 10 --expert-path model/expert.zip --learner-path model/learner.zip
-```
-
-To reproduce the full workflow on a workstation:
+To reproduce the full workflow (3 driving styles expert-agents training + AIRL/GAIL learner-agents training)  on a workstation:
 
 ```bash
 nohup bash scripts/run_pipeline.sh &
@@ -77,7 +62,7 @@ This trains experts for three `(a, b)` settings, generates rollouts in two envir
 
 ### Coefficients `a` and `b`
 
-`a` controls the weight of the speed reward. `b` determines the weight of the safe-distance penalty applied by `SafeDistanceRewardWrapper`.
+`a` controls the weight of the speed reward and `b` determines the weight of the safe-distance applied by `SafeDistanceRewardWrapper`.
 
 ### Why compare them for AIRL?
 

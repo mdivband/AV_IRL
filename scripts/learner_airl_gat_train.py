@@ -69,9 +69,12 @@ def train_airl_gat(
     learner.set_env(venv)
 
     reward_net = GATRewardNet(
-        obs_space=venv.observation_space,
-        act_space=venv.action_space,
-        in_features=5
+        venv.observation_space,
+        venv.action_space,
+        feature_dim=5,   # presence, x, y, vx, vy
+        hidden_gat=32,
+        hidden_mlp=64,
+        use_running_norm=True,
     )
     venv = RewardVecEnvWrapper(venv, reward_net.predict_processed)
 

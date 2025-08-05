@@ -93,6 +93,7 @@ def train_airl_once(
     ).to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
     
     venv = RewardVecEnvWrapper(venv, reward_net.reward)
+    logging.info("Loading rollouts from %s", rollout_filename)
 
     with open(rollout_pkl, "rb") as f:
         demos = pickle.load(f)

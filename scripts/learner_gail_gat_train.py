@@ -1,4 +1,4 @@
-import os, logging, argparse, pickle
+import os, logging, argparse, pickle, pathlib
 from typing import Optional
 import numpy as np
 import torch
@@ -68,9 +68,12 @@ def train_gail_gat(
     learner.set_env(venv)
 
     reward_net = GATRewardNet(
-        obs_space=venv.observation_space,
-        act_space=venv.action_space,
-        in_features=5
+        venv.observation_space,
+        venv.action_space,
+        feature_dim=5,   # presence, x, y, vx, vy
+        hidden_gat=32,
+        hidden_mlp=64,
+        use_running_norm=True,
     )
     venv = RewardVecEnvWrapper(venv, reward_net.predict_processed)
 
@@ -151,7 +154,7 @@ if __name__ == "__main__":
     )
 
     logging.info("Training GAT-GAIL on highway-fast-v0")
-    train_gail_gat(
+    reward_net_hf = train_gail_gat(
         env_name="highway-fast-v0",
         rollout_filename=f"rollout/hf_a{args.a}_b{args.b}_{args.size}.pkl",
         learner=learner,
@@ -162,7 +165,7 @@ if __name__ == "__main__":
     )
 
     logging.info("Training GAT-GAIL on merge-v0")
-    train_gail_gat(
+    reward_net_mg = train_gail_gat(
         env_name="merge-v0",
         rollout_filename=f"rollout/mg_a{args.a}_b{args.b}_{args.size}.pkl",
         learner=learner,
@@ -174,3 +177,8 @@ if __name__ == "__main__":
 
     learner.save(args.out)
     print("Saved GAT-GAIL learner ->", args.out)
+    
+    # Save the final reward network
+    reward_path = pathlib.Path(args.out).with_suffix("").with_suffix("_reward.pt")
+    torch.save(reward_net_mg, reward_path)
+    print("Saved GAT reward network ->", reward_path)

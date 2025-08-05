@@ -2,7 +2,7 @@
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="pygame.pkgdata")
 
-import os, logging, argparse, pickle
+import os, logging, argparse, pickle, pathlib
 from typing import Optional
 
 import numpy as np
@@ -60,7 +60,7 @@ def train_gail(
     ts: int,
     log_path: str,
     patience: int,
-) -> Optional[int]:
+) -> BasicShapedRewardNet:
 
     venv = make_vec_env(
         env_name,
@@ -114,7 +114,7 @@ def train_gail(
     except StopIteration:
         pass
 
-    return stopper.stop_step
+    return reward_net
 
 
 if __name__ == "__main__":
@@ -159,7 +159,7 @@ if __name__ == "__main__":
     )
 
     logging.info("Training on highway-fast-v0")
-    train_gail(
+    reward_net_hf = train_gail(
         env_name="highway-fast-v0",
         rollout_filename=f"rollout/hf_a{args.a}_b{args.b}_{args.size}.pkl",
         learner=learner,
@@ -170,7 +170,7 @@ if __name__ == "__main__":
     )
 
     logging.info("Training on merge-v0")
-    train_gail(
+    reward_net_mg = train_gail(
         env_name="merge-v0",
         rollout_filename=f"rollout/mg_a{args.a}_b{args.b}_{args.size}.pkl",
         learner=learner,
@@ -182,3 +182,8 @@ if __name__ == "__main__":
 
     learner.save(args.out)
     print("Saved GAIL learner ->", args.out)
+    
+    # Save the final reward network
+    reward_path = pathlib.Path(args.out).with_suffix("").with_suffix("_reward.pt")
+    torch.save(reward_net_mg, reward_path)
+    print("Saved reward network ->", reward_path)

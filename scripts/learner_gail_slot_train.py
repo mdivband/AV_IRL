@@ -1,9 +1,7 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="pygame.pkgdata")
 
-import os, logging, argparse, pickle
+import os, logging, argparse, pickle, pathlib
 from typing import Optional
 import numpy as np
 import torch
@@ -73,14 +71,16 @@ def train_gail(
     learner.set_env(venv)
 
     reward_net = SlotRewardNet(
-        obs_space=venv.observation_space,
-        act_space=venv.action_space,
+        venv.observation_space,
+        venv.action_space,
         num_slots=4,
         slot_dim=32,
         hidden=64,
     ).to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
 
-    venv = RewardVecEnvWrapper(venv, reward_net.forward)
+    # IMPORTANT: Use reward_net.reward instead of reward_net.forward
+    # reward method returns numpy arrays, forward returns torch tensors
+    venv = RewardVecEnvWrapper(venv, reward_net.reward)
 
     logging.info("Loading rollouts from %s", rollout_filename)
     with open(rollout_filename, "rb") as f:
@@ -108,7 +108,8 @@ def train_gail(
         env_make_kwargs={"config": KINEMATICS_REL_CFG},
         post_wrappers=[lambda e, _: ZeroRewardWrapper(e)],
     )
-    eval_env = RewardVecEnvWrapper(eval_env, reward_net.forward)
+    # IMPORTANT: Use reward_net.reward here too
+    eval_env = RewardVecEnvWrapper(eval_env, reward_net.reward)
 
     stopper = EarlyStopping(patience, eval_env)
 
@@ -117,7 +118,7 @@ def train_gail(
     except StopIteration:
         pass
 
-    return stopper.stop_step
+    return reward_net
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
@@ -160,7 +161,7 @@ if __name__ == "__main__":
     )
 
     logging.info("Training on highway-fast-v0")
-    train_gail(
+    reward_net_hf = train_gail(
         env_name="highway-fast-v0",
         rollout_filename=f"rollout/hf_a{args.a}_b{args.b}_{args.size}.pkl",
         learner=learner,
@@ -171,7 +172,7 @@ if __name__ == "__main__":
     )
 
     logging.info("Training on merge-v0")
-    train_gail(
+    reward_net_mg = train_gail(
         env_name="merge-v0",
         rollout_filename=f"rollout/mg_a{args.a}_b{args.b}_{args.size}.pkl",
         learner=learner,
@@ -182,4 +183,7 @@ if __name__ == "__main__":
     )
 
     learner.save(args.out)
-    print("Saved Slot-GAIL learner ->", args.out)
+    reward_path = pathlib.Path(args.out).with_suffix("").with_suffix("_reward.pt")
+    torch.save(reward_net_mg, reward_path)
+    print(f"Saved Slot-GAIL learner -> {args.out}")
+    print(f"Saved reward network -> {reward_path}")

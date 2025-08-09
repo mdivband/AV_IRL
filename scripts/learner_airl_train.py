@@ -14,6 +14,7 @@ from imitation.rewards.reward_nets import BasicShapedRewardNet
 from imitation.rewards.reward_wrapper import RewardVecEnvWrapper
 from imitation.util.networks import RunningNorm
 from imitation.util.util import make_vec_env
+from stable_baselines3.common.evaluation import evaluate_policy
 
 from highway_env.envs.merge_env import MergeEnv
 from av_irl import ZeroRewardWrapper
@@ -120,6 +121,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--env", default="highway-fast-v0")
     parser.add_argument("--out", default="model/airl_learner.zip")
+    parser.add_argument("--rout", default="model/airl_learner_reward.pt")
     parser.add_argument("--ts", type=int, default=100_000)
     parser.add_argument("--a", type=float, default=1)
     parser.add_argument("--b", type=float, default=1)
@@ -176,7 +178,8 @@ if __name__ == "__main__":
     )
 
     learner.save(args.out)
-    reward_path = f"model/reward_net_a{args.a}_b{args.b}_{args.size}_ts{args.ts}_reward.pt"
+    reward_path = args.rout
+
     torch.save(reward_net2, reward_path)
     print("Saved policy   ->", args.out)
     print("Saved reward   ->", reward_path)

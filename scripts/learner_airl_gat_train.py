@@ -117,6 +117,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--env", default="highway-fast-v0")
     parser.add_argument("--out", default="model/airl_gat.zip")
+    parser.add_argument("--rout", default="model/airl_gat_reward.pt")
     parser.add_argument("--ts", type=int, default=100000)
     parser.add_argument("--a", type=float, default=1)
     parser.add_argument("--b", type=float, default=1)
@@ -174,7 +175,7 @@ if __name__ == "__main__":
     )
 
     learner.save(args.out)
-    reward_path = f"model/reward_gat_a{args.a}_b{args.b}_{args.size}_ts{args.ts}.pt"
+    reward_path = args.rout
     torch.save(reward_net2, reward_path)
     print("Saved GAT-AIRL learner ->", args.out)
     print("Saved reward net ->", reward_path)

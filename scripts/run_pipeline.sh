@@ -12,8 +12,8 @@ mkdir -p model rollout logs
 AS=(0.2 0.5 0.8)
 BS=(0.8 0.5 0.2)
 
-ROLLOUT_SIZES=(100 500 2000 8000 32000)
-LEARNER_TS=(100000 200000)
+ROLLOUT_SIZES=(100 2000 8000 32000)
+LEARNER_TS=(200000)
 ENVS=("highway-fast-v0" "merge-v0")
 ENVS_L=("highway-fast-v0")
 
@@ -83,6 +83,7 @@ for i in "${!AS[@]}"; do
       for alg in airl gail airl_slot gail_slot airl_gat gail_gat; do
         for ts in "${LEARNER_TS[@]}"; do
           learner_zip="model/${alg}_a${a}_b${b}_${size}_ts${ts}.zip"
+          reward_net="model/${alg}_a${a}_b${b}_${size}_ts${ts}_reward.pt"
 
           if [[ -f "$learner_zip" ]]; then
             log "Learner model $learner_zip already exists – skipping training."
@@ -92,39 +93,39 @@ for i in "${!AS[@]}"; do
           log "Training $alg  env=$env  rollouts=$size  ts=$ts"
           case "$alg" in
             airl)
-              python scripts/learner_airl_train_loop.py \
+              python scripts/learner_airl_train.py \
                 --env "$env" --a "$a" --b "$b" --size "$size" \
-                --out "$learner_zip" --ts "$ts" \
+                --out "$learner_zip" --ts "$ts" --rout "$reward_net"\
                 > "logs/${alg}_a${a}_b${b}_${size}_ts${ts}.log" 2>&1
               ;;
             gail)
-              python scripts/learner_gail_train_loop.py \
+              python scripts/learner_gail_train.py \
                 --env "$env" --a "$a" --b "$b" --size "$size" \
-                --out "$learner_zip" --ts "$ts" \
+                --out "$learner_zip" --ts "$ts" --rout "$reward_net"\
                 > "logs/${alg}_a${a}_b${b}_${size}_ts${ts}.log" 2>&1
               ;;
             airl_slot)
               python scripts/learner_airl_slot_train.py \
                 --env "$env" --a "$a" --b "$b" --size "$size" \
-                --out "$learner_zip" --ts "$ts" \
+                --out "$learner_zip" --ts "$ts" --rout "$reward_net"\
                 > "logs/${alg}_a${a}_b${b}_${size}_ts${ts}.log" 2>&1
               ;;
             gail_slot)
               python scripts/learner_gail_slot_train.py \
                 --env "$env" --a "$a" --b "$b" --size "$size" \
-                --out "$learner_zip" --ts "$ts" \
+                --out "$learner_zip" --ts "$ts" --rout "$reward_net"\
                 > "logs/${alg}_a${a}_b${b}_${size}_ts${ts}.log" 2>&1
               ;;
             airl_gat)
               python scripts/learner_airl_gat_train.py \
                 --env "$env" --a "$a" --b "$b" --size "$size" \
-                --out "$learner_zip" --ts "$ts" \
+                --out "$learner_zip" --ts "$ts" --rout "$reward_net"\
                 > "logs/${alg}_a${a}_b${b}_${size}_ts${ts}.log" 2>&1
               ;;
             gail_gat)
               python scripts/learner_gail_gat_train.py \
                 --env "$env" --a "$a" --b "$b" --size "$size" \
-                --out "$learner_zip" --ts "$ts" \
+                --out "$learner_zip" --ts "$ts" --rout "$reward_net"\
                 > "logs/${alg}_a${a}_b${b}_${size}_ts${ts}.log" 2>&1
               ;;
           esac

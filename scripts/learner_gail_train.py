@@ -123,6 +123,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train a GAIL learner")
     parser.add_argument("--env", default="highway-fast-v0")
     parser.add_argument("--out", default="model/gail_learner.zip")
+    parser.add_argument("--rout", default="model/gail_learner_reward.pt")
     parser.add_argument("--ts", type=int, default=100000)
     parser.add_argument("--a", type=float, default=1)
     parser.add_argument("--b", type=float, default=1)
@@ -184,6 +185,6 @@ if __name__ == "__main__":
     print("Saved GAIL learner ->", args.out)
     
     # Save the final reward network
-    reward_path = pathlib.Path(args.out).with_suffix("").with_suffix("_reward.pt")
+    reward_path = args.rout
     torch.save(reward_net_mg, reward_path)
     print("Saved reward network ->", reward_path)

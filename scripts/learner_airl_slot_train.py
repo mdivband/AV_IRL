@@ -93,7 +93,7 @@ def train_airl_once(
     ).to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
     
     venv = RewardVecEnvWrapper(venv, reward_net.reward)
-    logging.info("Loading rollouts from %s", rollout_filename)
+    logging.info("Loading rollouts from %s", rollout_pkl)
 
     with open(rollout_pkl, "rb") as f:
         demos = pickle.load(f)
@@ -136,6 +136,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--env", default="highway-fast-v0")
     parser.add_argument("--out", default="model/airl_learner.zip")
+    parser.add_argument("--rout", default="model/airl_learner_reward.pt")
     parser.add_argument("--ts", type=int, default=100_000)
     parser.add_argument("--a", type=float, default=1)
     parser.add_argument("--b", type=float, default=1)
@@ -192,7 +193,7 @@ def main():
     )
 
     learner.save(args.out)
-    reward_path = pathlib.Path(args.out).with_suffix("").with_suffix("_reward.pt")
+    reward_path = args.rout
     torch.save(reward_net_final, reward_path)
     print("Saved policy ->", args.out)
     print("Saved reward ->", reward_path)

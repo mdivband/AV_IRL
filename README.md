@@ -64,16 +64,6 @@ This trains experts for three `(a, b)` settings, generates rollouts in two envir
 
 `a` controls the weight of the speed reward and `b` determines the weight of the safe-distance applied by `SafeDistanceRewardWrapper`.
 
-### Why compare them for AIRL?
-
-AIRL attempts to recover a reward function that explains the expert demonstrations. By training two AIRL models under different `(a, b)` settings and comparing their predicted rewards, you can check whether AIRL is sensitive to reward scaling versus safety penalties. If the estimated reward functions change noticeably when `a` and `b` are swapped, AIRL has not fully recovered a reward that is invariant to reward shaping.
-
-The `reward_comparison.py` script prints the predicted reward for a dummy observation from each model. Examine these values to judge whether the two estimated reward networks differ significantly.
-
-### Why not compare them for GAIL?
-
-GAIL learns its reward solely from a discriminator that distinguishes expert and learner trajectories. It does not use the environment reward, so changing `a` or `b` would have no direct effect. Consequently, GAIL is already invariant to these coefficients and no comparison is needed.
-
 ### Structure-Aware Reward Networks
 
 To address the challenge of modelling high-dimensional, structured observations (such as ego + multiple surrounding vehicles), we provide two alternative encoders:
